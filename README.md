@@ -30,7 +30,28 @@ DigitalTwin/
 │
 ├─ ground/                        # ground station (processing and visualization)
 │  ├─ app/                        # FastAPI services and business logic
-│  ├─ web/                        # web interface (Three.js + data panels)
+│  │  ├─ config.py                # global parameters (IP, ports, battery curves…)
+│  │  ├─ main.py                  # entry point: starts ingestion, estimation, and API
+│  │  ├─ wiring.py                # “connection board”: shared instances (queue, services, state)
+│  │  ├─ schemas.py               # Pydantic data models (raw Telemetry, processed State)
+│  │  ├─ services/                # business logic (each ship system, but processed on ground)
+│  │  │  ├─ ingest_udp.py         # receives telemetry from ESP32 over WiFi/UDP
+│  │  │  ├─ state_estimator.py    # IMU/GPS fusion → roll, pitch, yaw, speed, heading
+│  │  │  ├─ battery.py            # estimates SoC and autonomy from V/A
+│  │  │  ├─ depth_mapper.py       # builds depth cloud/map with GPS+z points
+│  │  │  └─ recorder.py           # saves telemetry/state into SQLite
+│  │  ├─ api/
+│  │  │  ├─ http.py               # FastAPI REST endpoints (e.g. /state)
+│  │  │  └─ ws.py                 # WebSocket for live state streaming
+│  │  └─ utils/
+│  │     ├─ geo.py                # GPS → ENU (flat coordinate) conversions
+│  │     └─ filters.py            # fusion algorithms (Madgwick/EKF, averages, EKF)
+│  ├─ web/
+│  │  ├─ index.html               # web interface (Three.js + data panels)
+│  │  └─ app.js                   # JavaScript consuming API/WS and updating UI
+│  ├─ scripts/
+│  │  └─ replay.py                # replays a saved log → API (debug/replay)
+│  ├─ tests/                      # unit tests for services and utilities
 │  ├─ requirements.txt            # Python dependencies
 │  └─ Dockerfile                  # container definition
 │
