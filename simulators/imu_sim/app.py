@@ -1,4 +1,4 @@
-"""GPS simulator placeholder."""
+"""IMU simulator placeholder."""
 
 import os
 

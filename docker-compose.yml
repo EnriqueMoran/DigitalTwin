@@ -1,6 +1,5 @@
 version: "3.9"
 services:
-  # --- Ground Station ---
   ground:
     build: ./ground
     container_name: digitaltwin_ground
@@ -8,29 +7,42 @@ services:
       - "8000:8000"
     restart: unless-stopped
 
-  # --- Simulators ---
   imu_sim:
-    build: ./simulators/imu_sim
+    build:
+      context: .
+      dockerfile: simulators/imu_sim/Dockerfile
     container_name: imu_sim
     environment:
       - HOST=esp32_sim
       - PORT=9000
+      - RUN_TESTS=1
+    depends_on:
+      - esp32_sim
 
   gps_sim:
-    build: ./simulators/gps_sim
+    build:
+      context: .
+      dockerfile: simulators/gps_sim/Dockerfile
     container_name: gps_sim
     environment:
       - HOST=esp32_sim
       - PORT=9000
+      - RUN_TESTS=0
+    depends_on:
+      - esp32_sim
 
   battery_sim:
-    build: ./simulators/battery_sim
+    build:
+      context: .
+      dockerfile: simulators/battery_sim/Dockerfile
     container_name: battery_sim
     environment:
       - HOST=esp32_sim
       - PORT=9000
+      - RUN_TESTS=0
+    depends_on:
+      - esp32_sim
 
-  # --- ESP32 simulator ---
   esp32_sim:
     build: ./simulators/esp32_sim
     container_name: esp32_sim

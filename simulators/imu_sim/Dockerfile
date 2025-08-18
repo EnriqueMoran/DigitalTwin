@@ -1,6 +1,14 @@
 FROM python:3.11-slim
+
 WORKDIR /app
-COPY requirements.txt .
+
+COPY simulators/imu_sim/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
-COPY app.py .
-CMD ["python", "app.py"]
+
+COPY pyproject.toml .
+COPY simulators ./simulators
+RUN pip install --no-cache-dir -e .
+
+ENV RUN_TESTS=0
+
+CMD ["sh", "-c", "if [ \"$RUN_TESTS\" = \"1\" ]; then pytest -q simulators/imu_sim/tests -o cache_dir=/tmp/pytest_cache; else python -m simulators.imu_sim.app; fi"]

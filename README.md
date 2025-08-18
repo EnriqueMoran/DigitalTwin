@@ -71,6 +71,13 @@ docker-compose up --build
 
 This launches the ground station on port `8000` and separate containers for each simulator. Telemetry flows from the simulators to the ESP32 multiplexer simulator and finally to the ground station for processing and visualization.
 
+Build and start one single component:
+```bash
+docker compose up --build imu_sim
+```
+
+
+
 ## Future Plans
 
 Long-term goals for the digital twin include:
