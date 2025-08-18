@@ -5,7 +5,7 @@ from pathlib import Path
 
 class IMUParser:
     def __init__(self, filename="config.ini"):
-        self.config = configparser.ConfigParser()
+        self.config = configparser.ConfigParser(inline_comment_prefixes=(';'))
         self.config.read(Path(filename))
 
     # Accelerometer
