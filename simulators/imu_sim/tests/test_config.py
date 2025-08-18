@@ -1,19 +1,26 @@
 """Tests for the IMU simulator configuration loader."""
 
 import sys
+from pathlib import Path
 import tempfile
 import textwrap
-from pathlib import Path
 
 import pytest
 
-# Ensure repository root is on PYTHONPATH so that ``simulators`` package can be imported.
-ROOT = Path(__file__).resolve().parents[3]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+try:
+    ROOT = Path(__file__).resolve().parents[3]
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+except IndexError:
+    # Repository root not available (e.g., inside Docker image).
+    pass
 
-from simulators.imu_sim.lib.imu import MPU9250
-from simulators.imu_sim.lib.enums import AccelerationRange, DLPF
+try:  # Import from repository package layout
+    from simulators.imu_sim.lib.imu import MPU9250
+    from simulators.imu_sim.lib.enums import AccelerationRange, DLPF
+except ModuleNotFoundError:  # Fallback when running inside Docker image
+    from lib.imu import MPU9250
+    from lib.enums import AccelerationRange, DLPF
 
 
 VALID_CONFIG = textwrap.dedent(
