@@ -71,6 +71,16 @@ docker-compose up --build
 
 This launches the ground station on port `8000` and separate containers for each simulator. Telemetry flows from the simulators to the ESP32 multiplexer simulator and finally to the ground station for processing and visualization.
 
+### Running IMU simulator tests
+
+The IMU simulator container can also execute its unit tests. Set the `RUN_TESTS` environment variable when starting the container to run the tests instead of the normal simulator application:
+
+```bash
+docker-compose run -e RUN_TESTS=1 imu_sim
+```
+
+Omitting `RUN_TESTS` (or setting it to any value other than `1`) runs the simulator normally.
+
 ## Future Plans
 
 Long-term goals for the digital twin include:

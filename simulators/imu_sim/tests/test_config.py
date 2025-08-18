@@ -1,21 +1,34 @@
+"""Tests for the IMU simulator configuration loader."""
+
 import sys
 import tempfile
+import textwrap
+from pathlib import Path
+
+import pytest
+
+# Ensure repository root is on PYTHONPATH so that ``simulators`` package can be imported.
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from simulators.imu_sim.lib.imu import MPU9250
-from simulators.imu_sim.lib.enums import (
-    AccelerationRange, GyroscopeRange, MagnetometerRange, DLPF
+from simulators.imu_sim.lib.enums import AccelerationRange, DLPF
+
+
+VALID_CONFIG = textwrap.dedent(
+    """
+    [accelerometer]
+    range = 1
+    dlpf = 1
+    bias_x = 0.01
+    bias_y = -0.02
+    bias_z = 0.03
+    noise_density = 0.0003
+    sample_rate_div = 4
+    """
 )
 
-VALID_CONFIG = """
-[accelerometer]
-range = 1
-dlpf = 1
-bias_x = 0.01
-bias_y = -0.02
-bias_z = 0.03
-noise_density = 0.0003
-sample_rate_div = 4
-"""
 
 def make_temp_config(content: str) -> str:
     f = tempfile.NamedTemporaryFile(delete=False, suffix=".ini")
@@ -23,87 +36,46 @@ def make_temp_config(content: str) -> str:
     f.flush()
     return f.name
 
-def test_valid_config_loads_correctly():
+
+def test_valid_config_loads_correctly() -> None:
     path = make_temp_config(VALID_CONFIG)
     imu = MPU9250(path)
     imu.read_config()
 
-    assert imu.accel_range == AccelerationRange.ACCEL_RANGE_2G, "Invalid accel_range"
-    assert imu.accel_dlpf == DLPF.ACTIVE, "Invalid accel_dlpf"
-    assert imu.accel_bias == [0.01, -0.02, 0.03], "Invalid accel_bias"
-    assert abs(imu.accel_noise_density - 0.0003) < 1e-12, "Invalid accel_noise_density"
-    assert imu.accel_smplrt_div == 4, "Invalid accel_smplrt_div"
+    assert imu.accel_range == AccelerationRange.ACCEL_RANGE_2G
+    assert imu.accel_dlpf == DLPF.ACTIVE
+    assert imu.accel_bias == [0.01, -0.02, 0.03]
+    assert abs(imu.accel_noise_density - 0.0003) < 1e-12
+    assert imu.accel_smplrt_div == 4
 
 
-def test_invalid_accel_range_raises_value_error():
+def test_invalid_accel_range_raises_value_error() -> None:
     bad = VALID_CONFIG.replace("range = 1", "range = 99", 1)
     path = make_temp_config(bad)
     imu = MPU9250(path)
-    try:
+    with pytest.raises(ValueError):
         imu.read_config()
-        raise AssertionError("Expected ValueError for invalid accelerometer range")
-    except ValueError:
-        pass
 
-def test_invalid_accel_dlpf_raises_value_error():
+
+def test_invalid_accel_dlpf_raises_value_error() -> None:
     bad = VALID_CONFIG.replace("dlpf = 1", "dlpf = 5", 1)
     path = make_temp_config(bad)
     imu = MPU9250(path)
-    try:
+    with pytest.raises(ValueError):
         imu.read_config()
-        raise AssertionError("Expected ValueError for invalid DLPF value")
-    except ValueError:
-        pass
 
-def test_invalid_bias_type_raises_value_error():
+
+def test_invalid_bias_type_raises_value_error() -> None:
     bad = VALID_CONFIG.replace("bias_x = 0.01", "bias_x = text", 1)
     path = make_temp_config(bad)
     imu = MPU9250(path)
-    try:
+    with pytest.raises(ValueError):
         imu.read_config()
-        raise AssertionError("Expected ValueError while parsing bias_x as float")
-    except ValueError:
-        pass
 
-def test_negative_sample_rate_div_raises_type_error():
+
+def test_negative_sample_rate_div_raises_type_error() -> None:
     bad = VALID_CONFIG.replace("sample_rate_div = 4", "sample_rate_div = -3", 1)
     path = make_temp_config(bad)
     imu = MPU9250(path)
-    try:
+    with pytest.raises(TypeError):
         imu.read_config()
-        raise AssertionError("Expected TypeError for negative sample_rate_div")
-    except TypeError:
-        pass
-
-def main():
-    tests = [
-        test_valid_config_loads_correctly,
-        test_invalid_accel_range_raises_value_error,
-        test_invalid_accel_dlpf_raises_value_error,
-        test_invalid_bias_type_raises_value_error,
-        test_negative_sample_rate_div_raises_type_error,
-    ]
-    failures = 0
-    for t in tests:
-        try:
-            t()
-            print(f"[OK] {t.__name__}")
-        except AssertionError as e:
-            failures += 1
-            print(f"[FAIL] {t.__name__}: {e}")
-        except Exception as e:
-            failures += 1
-            print(f"[ERROR] {t.__name__}: {type(e).__name__}: {e}")
-
-    if failures:
-        print(f"\nCHECK: {failures} FAILURE(s).")
-        sys.exit(1)
-    else:
-        print("\nCHECK: OK")
-        sys.exit(0)
-
-if __name__ == "__main__":
-    main()
-
-if __name__ == "__main__":
-    main()

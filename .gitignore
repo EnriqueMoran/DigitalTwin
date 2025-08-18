@@ -15,6 +15,7 @@ downloads/
 eggs/
 .eggs/
 lib/
+!simulators/imu_sim/lib/
 lib64/
 parts/
 sdist/
