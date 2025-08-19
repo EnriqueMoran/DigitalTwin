@@ -143,8 +143,7 @@ def run_and_plot(config_path: str,
 
 def _guess_range_g(imu: MPU9250) -> int:
     """
-    Utility to print human-friendly range from your enum setting.
-    Adjust if your enum changes.
+    Utility to print human-friendly range from enum setting.
     """
     from simulators.imu_sim.lib.enums import AccelerometerRange
     m = {
