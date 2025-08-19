@@ -164,7 +164,7 @@ if __name__ == "__main__":
     FREQ_HZ     = 1.5           # used only for "sine"
     DURATION_S  = 3.0           # total time to simulate
     SEED        = 1             # for reproducibility of noise
-    LPF_CUT_HZ  = 100.0         # try 10.0 to see more smoothing; 0.0 disables LPF
+    LPF_CUT_HZ  = 100.0         # 0.0 disables LPF
 
     ROLL_DEG   = 0.0            # rotation about sensor X
     PITCH_DEG  = 0.0            # rotation about sensor Y
