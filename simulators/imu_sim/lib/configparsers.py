@@ -50,3 +50,26 @@ class IMUParser:
 
     def parse_gyro_smplrt_div(self):
         return self.config["gyroscope"].getint("sample_rate_div", fallback=0)
+    
+
+    # Magnetometer
+    def parse_mag_range(self) -> int:
+        return self.config["magnetometer"].getint("range", fallback=2)
+    
+    def parse_mag_mode(self) -> int:
+        return self.config["magnetometer"].getint("mode", fallback=3)
+    
+    def parse_mag_bias(self) -> list[float]:
+        m = self.config["magnetometer"]
+        return [m.getfloat("bias_x", fallback=0.0),
+                m.getfloat("bias_y", fallback=0.0),
+                m.getfloat("bias_z", fallback=0.0)]
+
+    def parse_mag_noise_density(self) -> float:
+        return self.config["magnetometer"].getfloat("noise_density", fallback=0.4)
+
+    def parse_mag_world(self) -> list[float]:
+        m = self.config["magnetometer"]
+        return [m.getfloat("world_x", fallback=20.0),
+                m.getfloat("world_y", fallback=0.0),
+                m.getfloat("world_z", fallback=40.0)]

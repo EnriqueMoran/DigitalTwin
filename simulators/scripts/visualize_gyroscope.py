@@ -62,7 +62,7 @@ def sine_rate_profile(t: float, axis: int = 0, amp_dps: float = 50.0, freq_hz: f
 
 def _guess_range_dps(imu: MPU9250) -> int:
     """
-    Utility to print human-friendly gyro range from your enum setting.
+    Utility to print human-friendly gyro range from enum setting.
     """
     from simulators.imu_sim.lib.enums import GyroscopeRange
     m = {

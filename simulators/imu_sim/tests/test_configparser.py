@@ -1,8 +1,10 @@
 import pytest
 import re
 
-from simulators.imu_sim.lib.enums import AccelerometerRange, GyroscopeRange, DLPF
 from simulators.imu_sim.lib.imu_sim import MPU9250
+from simulators.imu_sim.lib.enums import (AccelerometerRange, GyroscopeRange, MagnetometerRange, 
+                                          MagnetometerMode, DLPF)
+
 
 VALID_CONFIG = """
 [accelerometer]
@@ -22,6 +24,17 @@ bias_y = -0.2
 bias_z = 0.3
 noise_density = 0.01
 sample_rate_div = 4
+
+[magnetometer]
+range = 2
+mode = 4
+bias_x = 3.0
+bias_y = -1.5
+bias_z = 0.5
+noise_density = 0.4
+world_x = 20.0
+world_y = 0.0
+world_z = 40.0
 """
 
 def replace_kv_in_section(ini_text: str, section: str, key: str, new_value: str) -> str:
@@ -295,3 +308,132 @@ def test_gyro_odr_computation_bypass_dlpf():
     imu.gyro_dlpf = DLPF.BYPASS
     imu.gyro_smplrt_div = 4
     assert abs(imu.gyro_odr_hz - 6400.0) < 1e-9
+
+
+def test_valid_mag_config_loads_correctly(tmp_path):
+    """Parser should populate all magnetometer fields with expected values from a valid INI."""
+    cfg_path = write_cfg(tmp_path, VALID_CONFIG)
+    imu = MPU9250(cfg_path)
+    imu.read_config()
+    assert imu.mag_range == MagnetometerRange.MAG_RANGE_16BITS
+    assert imu.mag_mode == MagnetometerMode.CONT_100HZ
+    assert imu.mag_bias == [3.0, -1.5, 0.5]
+    assert abs(imu.mag_noise_density - 0.4) < 1e-12
+    assert imu.mag_world == [20.0, 0.0, 40.0]
+    assert abs(imu.mag_odr_hz - 100.0) < 1e-12
+
+
+def test_invalid_mag_range_raises_value_error(tmp_path):
+    """An out-of-range magnetometer 'range' code must raise ValueError during parsing."""
+    bad = replace_kv_in_section(VALID_CONFIG, "magnetometer", "range", "99")
+    cfg_path = write_cfg(tmp_path, bad)
+    imu = MPU9250(cfg_path)
+    with pytest.raises(ValueError):
+        imu.read_config()
+
+
+def test_invalid_mag_mode_raises_value_error(tmp_path):
+    """An invalid magnetometer mode code must raise ValueError during parsing."""
+    bad = replace_kv_in_section(VALID_CONFIG, "magnetometer", "mode", "99")
+    cfg_path = write_cfg(tmp_path, bad)
+    imu = MPU9250(cfg_path)
+    with pytest.raises(ValueError):
+        imu.read_config()
+
+
+def test_invalid_mag_bias_type_raises_value_error(tmp_path):
+    """Non-numeric magnetometer bias values in the config must raise ValueError."""
+    bad = replace_kv_in_section(VALID_CONFIG, "magnetometer", "bias_x", "text")
+    cfg_path = write_cfg(tmp_path, bad)
+    imu = MPU9250(cfg_path)
+    with pytest.raises(ValueError):
+        imu.read_config()
+
+
+def test_invalid_mag_noise_density_type_raises_value_error(tmp_path):
+    """Non-numeric magnetometer noise_density in the config must raise ValueError."""
+    bad = replace_kv_in_section(VALID_CONFIG, "magnetometer", "noise_density", "text")
+    cfg_path = write_cfg(tmp_path, bad)
+    imu = MPU9250(cfg_path)
+    with pytest.raises(ValueError):
+        imu.read_config()
+
+
+def test_negative_mag_noise_density_raises_type_error(tmp_path):
+    """A negative magnetometer noise_density must raise TypeError."""
+    bad = replace_kv_in_section(VALID_CONFIG, "magnetometer", "noise_density", "-0.1")
+    cfg_path = write_cfg(tmp_path, bad)
+    imu = MPU9250(cfg_path)
+    with pytest.raises(TypeError):
+        imu.read_config()
+
+
+def test_invalid_mag_world_component_type_raises_value_error(tmp_path):
+    """Non-numeric magnetometer world field components must raise ValueError."""
+    bad = replace_kv_in_section(VALID_CONFIG, "magnetometer", "world_x", "east")
+    cfg_path = write_cfg(tmp_path, bad)
+    imu = MPU9250(cfg_path)
+    with pytest.raises(ValueError):
+        imu.read_config()
+
+
+def test_mag_range_rejects_invalid_type():
+    """Setter must reject non-int / non-enum types for mag_range."""
+    imu = MPU9250()
+    with pytest.raises(TypeError):
+        imu.mag_range = "16bits"
+    with pytest.raises(TypeError):
+        imu.mag_range = [2]
+
+
+def test_mag_mode_rejects_invalid_type():
+    """Setter must reject non-int / non-enum types for mag_mode."""
+    imu = MPU9250()
+    with pytest.raises(TypeError):
+        imu.mag_mode = {"mode": 4}
+    with pytest.raises(TypeError):
+        imu.mag_mode = 3.14  # float not allowed
+
+
+def test_mag_bias_rejects_invalid_type_and_shape():
+    """Setter must accept only a list of three numeric values for mag_bias."""
+    imu = MPU9250()
+    with pytest.raises(TypeError):
+        imu.mag_bias = "3.0,-1.5,0.5"
+    with pytest.raises(TypeError):
+        imu.mag_bias = [3.0, 0.0]
+    with pytest.raises(TypeError):
+        imu.mag_bias = [3.0, "x", 0.5]
+
+
+def test_mag_noise_density_rejects_invalid_type_and_negative():
+    """Setter must reject non-numeric types and negative values for mag_noise_density."""
+    imu = MPU9250()
+    with pytest.raises(TypeError):
+        imu.mag_noise_density = "0.4"
+    with pytest.raises(TypeError):
+        imu.mag_noise_density = -0.01
+
+
+def test_mag_world_rejects_invalid_type_and_shape():
+    """Setter must accept only a list of three numeric values for mag_world."""
+    imu = MPU9250()
+    with pytest.raises(TypeError):
+        imu.mag_world = "20,0,40"
+    with pytest.raises(TypeError):
+        imu.mag_world = [20.0, 0.0]
+    with pytest.raises(TypeError):
+        imu.mag_world = [20.0, None, 40.0]
+
+
+def test_mag_mode_sets_expected_odr():
+    """Setting mag_mode must update mag_odr_hz with the expected frequency."""
+    imu = MPU9250()
+    imu.mag_mode = MagnetometerMode.POWER_DOWN
+    assert abs(imu.mag_odr_hz - 0.0) < 1e-12
+    imu.mag_mode = MagnetometerMode.SINGLE
+    assert abs(imu.mag_odr_hz - 0.0) < 1e-12
+    imu.mag_mode = MagnetometerMode.CONT_8HZ
+    assert abs(imu.mag_odr_hz - 8.0) < 1e-12
+    imu.mag_mode = MagnetometerMode.CONT_100HZ
+    assert abs(imu.mag_odr_hz - 100.0) < 1e-12

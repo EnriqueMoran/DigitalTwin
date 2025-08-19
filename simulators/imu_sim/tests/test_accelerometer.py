@@ -23,6 +23,17 @@ bias_y = -0.2
 bias_z = 0.3
 noise_density = 0.01
 sample_rate_div = 4
+
+[magnetometer]
+range = 2
+mode = 4
+bias_x = 3.0
+bias_y = -1.5
+bias_z = 0.5
+noise_density = 0.4
+world_x = 20.0
+world_y = 0.0
+world_z = 40.0
 """
 
 CONFIG_WITH_BIAS = """
@@ -43,6 +54,17 @@ bias_y = -0.2
 bias_z = 0.3
 noise_density = 0.01
 sample_rate_div = 4
+
+[magnetometer]
+range = 2
+mode = 4
+bias_x = 3.0
+bias_y = -1.5
+bias_z = 0.5
+noise_density = 0.4
+world_x = 20.0
+world_y = 0.0
+world_z = 40.0
 """
 
 CONFIG_LPF = """
@@ -63,6 +85,17 @@ bias_y = -0.2
 bias_z = 0.3
 noise_density = 0.01
 sample_rate_div = 4
+
+[magnetometer]
+range = 2
+mode = 4
+bias_x = 3.0
+bias_y = -1.5
+bias_z = 0.5
+noise_density = 0.4
+world_x = 20.0
+world_y = 0.0
+world_z = 40.0
 """
 
 
