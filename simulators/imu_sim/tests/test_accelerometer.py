@@ -2,8 +2,7 @@ import math
 import numpy as np
 import pytest
 
-from simulators.imu_sim.lib.enums import AccelerationRange, DLPF
-from simulators.imu_sim.lib.imu import MPU9250
+from simulators.imu_sim.lib.imu_sim import MPU9250
 
 
 CONFIG_NO_NOISE = """
@@ -14,6 +13,15 @@ bias_x = 0.0
 bias_y = 0.0
 bias_z = 0.0
 noise_density = 0.0
+sample_rate_div = 4
+
+[gyroscope]
+range = 1
+dlpf = 1
+bias_x = 0.1
+bias_y = -0.2
+bias_z = 0.3
+noise_density = 0.01
 sample_rate_div = 4
 """
 
@@ -26,6 +34,15 @@ bias_y = -0.02
 bias_z = 0.03
 noise_density = 0.0
 sample_rate_div = 4
+
+[gyroscope]
+range = 1
+dlpf = 1
+bias_x = 0.1
+bias_y = -0.2
+bias_z = 0.3
+noise_density = 0.01
+sample_rate_div = 4
 """
 
 CONFIG_LPF = """
@@ -37,6 +54,15 @@ bias_y = 0.0
 bias_z = 0.0
 noise_density = 0.0
 sample_rate_div = 0
+
+[gyroscope]
+range = 1
+dlpf = 1
+bias_x = 0.1
+bias_y = -0.2
+bias_z = 0.3
+noise_density = 0.01
+sample_rate_div = 4
 """
 
 

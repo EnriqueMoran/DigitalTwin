@@ -1,7 +1,8 @@
 import pytest
+import re
 
-from simulators.imu_sim.lib.enums import AccelerationRange, DLPF
-from simulators.imu_sim.lib.imu import MPU9250
+from simulators.imu_sim.lib.enums import AccelerometerRange, GyroscopeRange, DLPF
+from simulators.imu_sim.lib.imu_sim import MPU9250
 
 VALID_CONFIG = """
 [accelerometer]
@@ -12,7 +13,39 @@ bias_y = -0.02
 bias_z = 0.03
 noise_density = 0.0003
 sample_rate_div = 4
+
+[gyroscope]
+range = 1
+dlpf = 1
+bias_x = 0.1
+bias_y = -0.2
+bias_z = 0.3
+noise_density = 0.01
+sample_rate_div = 4
 """
+
+def replace_kv_in_section(ini_text: str, section: str, key: str, new_value: str) -> str:
+    import re
+    pattern_section = rf"(?ms)^\[{re.escape(section)}\]\s*(.*?)(?=^\[|\Z)"
+    m = re.search(pattern_section, ini_text)
+    if not m:
+        return ini_text
+    body = m.group(1)
+
+    pattern_kv = rf"(?m)^(\s*{re.escape(key)}\s*=\s*).*$"
+
+    def _repl(match: re.Match) -> str:
+        return f"{match.group(1)}{new_value}"
+
+    new_body, n = re.subn(pattern_kv, _repl, body, count=1)
+    if n == 0:
+        if not body.endswith("\n"):
+            body += "\n"
+        new_body = body + f"{key} = {new_value}\n"
+
+    start, end = m.span(1)
+    return ini_text[:start] + new_body + ini_text[end:]
+
 
 def write_cfg(tmp_path, content: str) -> str:
     p = tmp_path / "imu_config.ini"
@@ -25,7 +58,7 @@ def test_valid_config_loads_correctly(tmp_path):
     cfg_path = write_cfg(tmp_path, VALID_CONFIG)
     imu = MPU9250(cfg_path)
     imu.read_config()
-    assert imu.accel_range == AccelerationRange.ACCEL_RANGE_2G
+    assert imu.accel_range == AccelerometerRange.ACCEL_RANGE_2G
     assert imu.accel_dlpf == DLPF.ACTIVE
     assert imu.accel_bias == [0.01, -0.02, 0.03]
     assert abs(imu.accel_noise_density - 0.0003) < 1e-12
@@ -34,7 +67,7 @@ def test_valid_config_loads_correctly(tmp_path):
 
 def test_invalid_accel_range_raises_value_error(tmp_path):
     """An out-of-range accelerometer 'range' code must raise ValueError during parsing."""
-    bad = VALID_CONFIG.replace("range = 1", "range = 99", 1)
+    bad = replace_kv_in_section(VALID_CONFIG, "accelerometer", "range", "99")
     cfg_path = write_cfg(tmp_path, bad)
     imu = MPU9250(cfg_path)
     with pytest.raises(ValueError):
@@ -43,7 +76,7 @@ def test_invalid_accel_range_raises_value_error(tmp_path):
 
 def test_invalid_accel_dlpf_raises_value_error(tmp_path):
     """An invalid DLPF code must raise ValueError during parsing."""
-    bad = VALID_CONFIG.replace("dlpf = 1", "dlpf = 5", 1)
+    bad = replace_kv_in_section(VALID_CONFIG, "accelerometer", "dlpf", "5")
     cfg_path = write_cfg(tmp_path, bad)
     imu = MPU9250(cfg_path)
     with pytest.raises(ValueError):
@@ -52,7 +85,7 @@ def test_invalid_accel_dlpf_raises_value_error(tmp_path):
 
 def test_invalid_bias_type_raises_value_error(tmp_path):
     """Non-numeric bias values in the config must raise ValueError during parsing."""
-    bad = VALID_CONFIG.replace("bias_x = 0.01", "bias_x = text", 1)
+    bad = replace_kv_in_section(VALID_CONFIG, "accelerometer", "bias_x", "text")
     cfg_path = write_cfg(tmp_path, bad)
     imu = MPU9250(cfg_path)
     with pytest.raises(ValueError):
@@ -61,7 +94,7 @@ def test_invalid_bias_type_raises_value_error(tmp_path):
 
 def test_negative_sample_rate_div_raises_type_error(tmp_path):
     """A negative sample_rate_div must raise TypeError (expects non-negative integer)."""
-    bad = VALID_CONFIG.replace("sample_rate_div = 4", "sample_rate_div = -3", 1)
+    bad = replace_kv_in_section(VALID_CONFIG, "accelerometer", "sample_rate_div", "-3")
     cfg_path = write_cfg(tmp_path, bad)
     imu = MPU9250(cfg_path)
     with pytest.raises(TypeError):
@@ -121,7 +154,7 @@ def test_accel_smplrt_div_requires_dlpf_first():
         imu.accel_smplrt_div = 4
 
 
-def test_odr_computation_active_dlpf():
+def test_accel_odr_computation_active_dlpf():
     """With DLPF active: ODR = 1000 / (1 + div). For div=4 => 200 Hz."""
     imu = MPU9250()
     imu.accel_dlpf = DLPF.ACTIVE
@@ -129,7 +162,7 @@ def test_odr_computation_active_dlpf():
     assert abs(imu.accel_odr_hz - 200.0) < 1e-9
 
 
-def test_odr_computation_bypass_dlpf():
+def test_accel_odr_computation_bypass_dlpf():
     """With DLPF bypass: ODR = 4000 / (1 + div). For div=4 => 800 Hz."""
     imu = MPU9250()
     imu.accel_dlpf = DLPF.BYPASS
@@ -137,7 +170,7 @@ def test_odr_computation_bypass_dlpf():
     assert abs(imu.accel_odr_hz - 800.0) < 1e-9
 
 
-def test_smplrt_div_multiple_of_4_required_in_bypass():
+def test_accel_smplrt_div_multiple_of_4_required_in_bypass():
     """In bypass mode, sample_rate_div must be a multiple of 4."""
     imu = MPU9250()
     imu.accel_dlpf = DLPF.BYPASS
@@ -145,3 +178,120 @@ def test_smplrt_div_multiple_of_4_required_in_bypass():
         imu.accel_smplrt_div = 3
     imu.accel_smplrt_div = 8
     assert imu.accel_smplrt_div == 8
+
+
+def test_valid_gyro_config_loads_correctly(tmp_path):
+    """Parser should populate all gyroscope fields with expected values from a valid INI."""
+    cfg_path = write_cfg(tmp_path, VALID_CONFIG)
+    imu = MPU9250(cfg_path)
+    imu.read_config()
+    assert imu.gyro_range == GyroscopeRange.GYRO_RANGE_250DPS
+    assert imu.gyro_dlpf == DLPF.ACTIVE
+    assert imu.gyro_bias == [0.1, -0.2, 0.3]
+    assert abs(imu.gyro_noise_density - 0.01) < 1e-12
+    assert imu.gyro_smplrt_div == 4
+
+
+def test_invalid_gyro_range_raises_value_error(tmp_path):
+    """An out-of-range gyroscope 'range' code must raise ValueError during parsing."""
+    bad = replace_kv_in_section(VALID_CONFIG, "gyroscope", "range", "99")
+    cfg_path = write_cfg(tmp_path, bad)
+    imu = MPU9250(cfg_path)
+    with pytest.raises(ValueError):
+        imu.read_config()
+
+
+def test_invalid_gyro_dlpf_raises_value_error(tmp_path):
+    """An invalid gyroscope DLPF code must raise ValueError during parsing."""
+    bad = replace_kv_in_section(VALID_CONFIG, "gyroscope", "dlpf", "5")
+    cfg_path = write_cfg(tmp_path, bad)
+    imu = MPU9250(cfg_path)
+    with pytest.raises(ValueError):
+        imu.read_config()
+
+
+def test_invalid_gyro_bias_type_raises_value_error(tmp_path):
+    """Non-numeric gyroscope bias values in the config must raise ValueError during parsing."""
+    bad = replace_kv_in_section(VALID_CONFIG, "gyroscope", "bias_x", "text")
+    cfg_path = write_cfg(tmp_path, bad)
+    imu = MPU9250(cfg_path)
+    with pytest.raises(ValueError):
+        imu.read_config()
+
+
+def test_negative_gyro_sample_rate_div_raises_type_error(tmp_path):
+    """A negative gyroscope sample_rate_div must raise TypeError (expects non-negative integer)."""
+    bad = replace_kv_in_section(VALID_CONFIG, "gyroscope", "sample_rate_div", "-3")
+    cfg_path = write_cfg(tmp_path, bad)
+    imu = MPU9250(cfg_path)
+    with pytest.raises(TypeError):
+        imu.read_config()
+
+
+def test_gyro_range_rejects_invalid_type():
+    """Setter must reject non-int / non-enum types for gyro_range."""
+    imu = MPU9250()
+    with pytest.raises(TypeError):
+        imu.gyro_range = "250dps"
+    with pytest.raises(TypeError):
+        imu.gyro_range = [1]
+
+
+def test_gyro_dlpf_rejects_invalid_type():
+    """Setter must reject non-int / non-enum types for gyro_dlpf."""
+    imu = MPU9250()
+    with pytest.raises(TypeError):
+        imu.gyro_dlpf = 3.14
+    with pytest.raises(TypeError):
+        imu.gyro_dlpf = {"dlpf": 1}
+
+
+def test_gyro_bias_rejects_invalid_type_and_shape():
+    """Setter must accept only a list of three numeric values for gyro_bias."""
+    imu = MPU9250()
+    with pytest.raises(TypeError):
+        imu.gyro_bias = "0.0,0.0,0.0"
+    with pytest.raises(TypeError):
+        imu.gyro_bias = [0.0, 1.0]
+    with pytest.raises(TypeError):
+        imu.gyro_bias = [0.0, "x", 1.0]
+
+
+def test_gyro_noise_density_rejects_invalid_type():
+    """Setter must reject non-numeric types for gyro_noise_density."""
+    imu = MPU9250()
+    with pytest.raises(TypeError):
+        imu.gyro_noise_density = "0.01"
+
+
+def test_gyro_smplrt_div_rejects_invalid_type_and_negative():
+    """Setter must reject non-int and negative values for gyro_smplrt_div."""
+    imu = MPU9250()
+    imu.gyro_dlpf = DLPF.ACTIVE
+    with pytest.raises(TypeError):
+        imu.gyro_smplrt_div = "10"
+    with pytest.raises(TypeError):
+        imu.gyro_smplrt_div = -5
+
+
+def test_gyro_smplrt_div_requires_dlpf_first():
+    """Setting gyro_smplrt_div before gyro_dlpf must raise ValueError."""
+    imu = MPU9250()
+    with pytest.raises(ValueError):
+        imu.gyro_smplrt_div = 4
+
+
+def test_gyro_odr_computation_active_dlpf():
+    """With DLPF active: ODR = 1000 / (1 + div). For div=4 => 200 Hz."""
+    imu = MPU9250()
+    imu.gyro_dlpf = DLPF.ACTIVE
+    imu.gyro_smplrt_div = 4
+    assert abs(imu.gyro_odr_hz - 200.0) < 1e-9
+
+
+def test_gyro_odr_computation_bypass_dlpf():
+    """With DLPF bypass: ODR = 32000 / (1 + div). For div=4 => 6400 Hz."""
+    imu = MPU9250()
+    imu.gyro_dlpf = DLPF.BYPASS
+    imu.gyro_smplrt_div = 4
+    assert abs(imu.gyro_odr_hz - 6400.0) < 1e-9

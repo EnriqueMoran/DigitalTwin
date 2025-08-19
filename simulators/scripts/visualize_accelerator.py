@@ -4,11 +4,9 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 
-from simulators.imu_sim.lib.imu import MPU9250
+from simulators.imu_sim.lib.imu_sim import MPU9250
 
 G = 9.80665
-
-# --------- rotation helpers ---------
 
 def Rx(deg: float) -> np.ndarray:
     th = np.deg2rad(deg); c, s = np.cos(th), np.sin(th)
@@ -24,7 +22,7 @@ def Ry(deg: float) -> np.ndarray:
 
 def Rz(deg: float) -> np.ndarray:
     th = np.deg2rad(deg); c, s = np.sin(th), np.cos(th)
-    # careful: np.sin/np.cos order; swap to keep standard convention
+    # swap to keep standard convention
     s, c = np.sin(th), np.cos(th)
     return np.array([[c,-s, 0],
                      [s, c, 0],
@@ -40,7 +38,6 @@ def euler_R_world_to_sensor(roll_deg: float, pitch_deg: float, yaw_deg: float) -
     """
     return Rx(roll_deg) @ Ry(pitch_deg) @ Rz(yaw_deg)
 
-# ---------- Scenario profiles (edit these or add new ones) ----------
 
 def step_profile(t: float, axis: int = 0, amp_g: float = 1.0,
                  T_on: float = 0.5, T_off: float = 0.5, T_neg: float = 0.5) -> np.ndarray:
@@ -67,8 +64,6 @@ def sine_profile(t: float, axis: int = 0, amp_g: float = 1.0, freq_hz: float = 1
     a = np.zeros(3, dtype=float)
     a[axis] = amp_g * G * math.sin(2.0 * math.pi * freq_hz * t)
     return a
-
-# ---------------------- Simulation/plot runner ----------------------
 
 def run_and_plot(config_path: str,
                  scenario: str = "step",       # "step" or "sine"
@@ -129,7 +124,7 @@ def run_and_plot(config_path: str,
     plt.grid(True)
     plt.tight_layout()
 
-    # Optional: counts plot (comment out if you want only one chart)
+    # Optional: counts plot
     plt.figure(figsize=(10, 5))
     plt.plot(t_arr, cnt_arr[:, 0], label="counts_x")
     plt.plot(t_arr, cnt_arr[:, 1], label="counts_y")
@@ -151,16 +146,15 @@ def _guess_range_g(imu: MPU9250) -> int:
     Utility to print human-friendly range from your enum setting.
     Adjust if your enum changes.
     """
-    from simulators.imu_sim.lib.enums import AccelerationRange
+    from simulators.imu_sim.lib.enums import AccelerometerRange
     m = {
-        AccelerationRange.ACCEL_RANGE_2G: 2,
-        AccelerationRange.ACCEL_RANGE_4G: 4,
-        AccelerationRange.ACCEL_RANGE_8G: 8,
-        AccelerationRange.ACCEL_RANGE_16G: 16,
+        AccelerometerRange.ACCEL_RANGE_2G: 2,
+        AccelerometerRange.ACCEL_RANGE_4G: 4,
+        AccelerometerRange.ACCEL_RANGE_8G: 8,
+        AccelerometerRange.ACCEL_RANGE_16G: 16,
     }
     return m.get(imu.accel_range, -1)
 
-# ------------------------------- Main --------------------------------
 
 if __name__ == "__main__":
     CONFIG_PATH = "./simulators/imu_sim/config.ini"

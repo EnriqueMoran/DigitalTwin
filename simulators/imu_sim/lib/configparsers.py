@@ -28,3 +28,25 @@ class IMUParser:
 
     def parse_accel_smplrt_div(self):
         return self.config["accelerometer"].getint("sample_rate_div", fallback=0)
+    
+
+    # Gyroscope
+    def parse_gyro_range(self):
+        idx = self.config["gyroscope"].getint("range", fallback=1)
+        return idx
+    
+    def parse_gyro_dlpf(self):
+        idx = self.config["gyroscope"].getint("dlpf", fallback=1)
+        return idx
+    
+    def parse_gyro_bias(self):
+        bx = self.config["gyroscope"].getfloat("bias_x", fallback=0.0)
+        by = self.config["gyroscope"].getfloat("bias_y", fallback=0.0)
+        bz = self.config["gyroscope"].getfloat("bias_z", fallback=0.0)
+        return [bx, by, bz]
+
+    def parse_gyro_noise_density(self):
+        return self.config["gyroscope"].getfloat("noise_density", fallback=0.01)
+
+    def parse_gyro_smplrt_div(self):
+        return self.config["gyroscope"].getint("sample_rate_div", fallback=0)
