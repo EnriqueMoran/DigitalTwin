@@ -1,0 +1,82 @@
+{
+  "topics": {
+    "sim/imu": {
+      "description": "Simulated IMU values",
+      "direction": "publisher=simulator, subscriber=esp32_sim",
+      "qos_recommended": 0,
+      "schema": {
+        "type": "object",
+        "required": ["ax","ay","az","gx","gy","gz","ts","seq"],
+        "properties": {
+          "ax": {"type":"number"},
+          "ay": {"type":"number"},
+          "az": {"type":"number"},
+          "gx": {"type":"number"},
+          "gy": {"type":"number"},
+          "gz": {"type":"number"},
+          "ts": {"type":"string", "format":"date-time"},
+          "seq": {"type":"integer"}
+        }
+      }
+    },
+    "sim/gps": {
+      "description": "Simulated GPS location",
+      "direction": "publisher=simulator, subscriber=esp32_sim",
+      "qos_recommended": 1,
+      "schema": {
+        "type":"object",
+        "required":["lat","lon","ts"],
+        "properties":{
+          "lat":{"type":"number"},
+          "lon":{"type":"number"},
+          "alt":{"type":"number"},
+          "fix":{"type":"integer"},
+          "ts":{"type":"string","format":"date-time"}
+        }
+      }
+    },
+    "sim/battery": {
+      "description": "Simulated Battery condition",
+      "direction": "publisher=simulator, subscriber=esp32_sim",
+      "qos_recommended": 1,
+      "schema": {
+        "type":"object",
+        "required":["v","soc","ts"],
+        "properties":{
+          "v":{"type":"number"},
+          "soc":{"type":"number"},
+          "ts":{"type":"string","format":"date-time"}
+        }
+      }
+    },
+    "sensor/imu": {
+      "description": "Re published IMU values from ESP32",
+      "direction": "publisher=esp32_sim, subscriber=station",
+      "qos_recommended": 0,
+      "schema": { "$ref": "#/topics/sim/imu/schema" }
+    },
+    "sensor/gps": {
+      "description": "Re published GPS location from ESP32",
+      "direction": "publisher=esp32_sim, subscriber=station",
+      "qos_recommended": 1,
+      "schema": { "$ref": "#/topics/sim/gps/schema" }
+    },
+    "sensor/battery": {
+      "description": "Re published Battery condition from ESP32",
+      "direction": "publisher=esp32_sim, subscriber=station",
+      "qos_recommended": 1,
+      "schema": { "$ref": "#/topics/sim/battery/schema" }
+    },
+    "sensor/status": {
+      "description": "Online/offline LWT status (retained)",
+      "direction": "publisher=esp32_sim, subscriber=station",
+      "qos_recommended": 1,
+      "retained": true,
+      "schema": {
+        "type":"object",
+        "required":["status","ts"],
+        "properties":{"status":{"type":"string"},"ts":{"type":"string","format":"date-time"}}
+      }
+    }
+  }
+}

@@ -45,8 +45,11 @@ services:
       - esp32_sim
 
   esp32_sim:
-    build: ./simulators/esp32_sim
+    build:
+      context: .
+      dockerfile: ./simulators/esp32_sim/Dockerfile
     container_name: esp32_sim
     environment:
       - GROUND_HOST=ground
       - GROUND_PORT=9001
+      - RUN_TESTS=1

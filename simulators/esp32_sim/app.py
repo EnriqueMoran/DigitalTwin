@@ -1,15 +1,47 @@
-"""ESP32 telemetry multiplexer simulator placeholder."""
-
+import logging
 import os
+import signal
+import sys
+
+from simulators.esp32_sim.lib.esp32_sim import ESP32Sim, LOG as _LOG
+
+LOG = logging.getLogger("esp32_sim.app")
 
 
-def main() -> None:
-    ground_host = os.getenv("GROUND_HOST", "ground")
-    ground_port = int(os.getenv("GROUND_PORT", "9001"))
-    print(
-        f"ESP32 simulator forwarding telemetry to {ground_host}:{ground_port} (not implemented)"
-    )
+def _get_log_level() -> int:
+    """
+    Decide logging level:
+    - If LOGLEVEL env var is set, use it (DEBUG/INFO/WARNING/ERROR).
+    - Else if DEBUG env var is truthy use DEBUG.
+    - Otherwise INFO.
+    """
+    lvl = os.getenv("LOGLEVEL")
+    if lvl:
+        try:
+            return getattr(logging, lvl.upper())
+        except Exception:
+            pass
+    debug = os.getenv("DEBUG", "0").lower()
+    if debug in ("1", "true", "yes", "on"):
+        return logging.DEBUG
+    return logging.INFO
 
+
+def main():
+    # logging: DEBUG if env var SET, else INFO
+    logging.basicConfig(level=_get_log_level(), format="%(asctime)s %(levelname)s %(message)s")
+    cfg = "config.ini"
+    sim = ESP32Sim(cfg)
+
+    def _sig(sig, frame):
+        LOG.info("Signal %s received, shutting down", sig)
+        sim.stop()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, _sig)
+    signal.signal(signal.SIGTERM, _sig)
+
+    sim.start()
 
 if __name__ == "__main__":
     main()

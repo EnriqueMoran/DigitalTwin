@@ -1,1 +1,4 @@
-# placeholder requirements
+paho-mqtt>=1.6.1
+python-dateutil>=2.8.2
+pytest
+jsonschema>=4.0.0
