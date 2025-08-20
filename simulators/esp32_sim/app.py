@@ -3,7 +3,7 @@ import os
 import signal
 import sys
 
-from simulators.esp32_sim.lib.esp32_sim import ESP32Sim, LOG as _LOG
+from simulators.esp32_sim.lib.esp32_sim import ESP32, LOG as _LOG
 
 LOG = logging.getLogger("esp32_sim.app")
 
@@ -31,7 +31,7 @@ def main():
     # logging: DEBUG if env var SET, else INFO
     logging.basicConfig(level=_get_log_level(), format="%(asctime)s %(levelname)s %(message)s")
     cfg = "config.ini"
-    sim = ESP32Sim(cfg)
+    sim = ESP32(cfg)
 
     def _sig(sig, frame):
         LOG.info("Signal %s received, shutting down", sig)

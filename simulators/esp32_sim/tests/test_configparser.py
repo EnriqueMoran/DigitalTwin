@@ -1,6 +1,9 @@
 import pytest
 from pathlib import Path
+
 from simulators.esp32_sim.lib.configparser import ESP32Parser
+from simulators.esp32_sim.lib.esp32_sim import ESP32
+
 
 VALID_CONFIG = """
 [broker]
@@ -68,118 +71,148 @@ def write_cfg(tmp_path: Path, content: str) -> str:
     return str(p)
 
 
-def test_full_config_parsed_correctly(tmp_path):
-    """Full example config: all parse_* helpers should return expected values."""
+def test_read_config_populates_properties(tmp_path):
     cfg_path = write_cfg(tmp_path, VALID_CONFIG)
-    parser = ESP32Parser(cfg_path)
+    esp = ESP32(cfg_path)
+    esp.read_config()
 
     # broker
-    assert parser.parse_broker_host() == "mosquitto"
-    assert parser.parse_broker_port() == 1883
+    assert esp.broker_host == "mosquitto"
+    assert esp.broker_port == 1883
 
-    # esp32 fields
-    assert parser.parse_client_id() == "esp32_sim"
-    assert parser.parse_retain_status() is True
+    # client
+    assert esp.client_id == "esp32_sim"
+    assert esp.retain_status is True
+
+    # topics in/out
+    assert esp.imu_in == "sim/imu"
+    assert esp.gps_in == "sim/gps"
+    assert esp.batt_in == "sim/battery"
+
+    assert esp.imu_out == "sensor/imu"
+    assert esp.gps_out == "sensor/gps"
+    assert esp.batt_out == "sensor/battery"
+
+    assert esp.status_topic == "sensor/status"
 
     # qos
-    assert parser.parse_publish_qos_imu()  == 0
-    assert parser.parse_publish_qos_gps()  == 1
-    assert parser.parse_publish_qos_batt() == 1
+    assert esp.qos_imu == 0
+    assert esp.qos_gps == 1
+    assert esp.qos_batt == 1
 
     # validation flags
-    assert parser.parse_validate_schema() is True
-    assert parser.parse_schema_path() == "../../shared/mqtt_topics.json"
+    assert esp.validate_schema is True
+    assert esp.schema_path == "../../shared/mqtt_topics.json"
 
-    # topics
-    assert parser.parse_imu_in() == "sim/imu"
-    assert parser.parse_gps_in() == "sim/gps"
-    assert parser.parse_battery_in() == "sim/battery"
-    assert parser.parse_imu_out() == "sensor/imu"
-    assert parser.parse_gps_out() == "sensor/gps"
-    assert parser.parse_battery_out()  == "sensor/battery"
-    assert parser.parse_status_topic() == "sensor/status"
-
-    # aggregators
-    broker_cfg = parser.get_broker_cfg()
-    assert broker_cfg["host"] == "mosquitto"
-    assert broker_cfg["port"] == 1883
-
-    qos_map = parser.get_qos_map()
-    assert qos_map == {"imu": 0, "gps": 1, "battery": 1}
-
-    topics_map = parser.get_topics_map()
-    assert topics_map["imu_in"] == "sim/imu"
-    assert topics_map["battery_out"]  == "sensor/battery"
-    assert topics_map["status_topic"] == "sensor/status"
+    # mqtt client created
+    assert esp.client is not None
 
 
 def test_alternate_battery_keys_and_publish_qos(tmp_path):
-    """Support alternate keys 'batt_in' / 'batt_out' and 'publish_qos_battery' fallback."""
     cfg_path = write_cfg(tmp_path, ALTERNATE_BATT_CONFIG)
-    parser = ESP32Parser(cfg_path)
+    esp = ESP32(cfg_path)
+    esp.read_config()
 
-    # broker
-    assert parser.parse_broker_host() == "example-broker"
-    assert parser.parse_broker_port() == 1884
+    assert esp.broker_host == "example-broker"
+    assert esp.broker_port == 1884
 
-    # esp32 fields
-    assert parser.parse_client_id() == "esp32_sim_alt"
-    assert parser.parse_retain_status() is False
+    assert esp.client_id == "esp32_sim_alt"
+    assert esp.retain_status is False
 
-    # publish qos: when publish_qos_batt is absent but publish_qos_battery present,
-    # parser.parse_publish_qos_batt should return the publish_qos_battery value (2)
-    assert parser.parse_publish_qos_batt() == 2
+    # when publish_qos_batt is absent but publish_qos_battery present, it should be used
+    assert esp.qos_batt == 2
 
-    # topics: batt_in / batt_out fallbacks should be picked up
-    assert parser.parse_battery_in()  == "sim/battery_alt"
-    assert parser.parse_battery_out() == "sensor/battery_alt"
-
-    # convenience maps should reflect the alternate names
-    topics_map = parser.get_topics_map()
-    assert topics_map["battery_in"]  == "sim/battery_alt"
-    assert topics_map["battery_out"] == "sensor/battery_alt"
+    # batt_in / batt_out fallback
+    assert esp.batt_in == "sim/battery_alt"
+    assert esp.batt_out == "sensor/battery_alt"
 
 
 def test_minimal_config_uses_defaults(tmp_path):
-    """When keys are missing, parser should return sensible defaults (no exceptions)."""
     cfg_path = write_cfg(tmp_path, MINIMAL_CONFIG)
-    parser = ESP32Parser(cfg_path)
+    esp = ESP32(cfg_path)
+    esp.read_config()
 
-    # defaults
-    assert parser.parse_broker_host() == "localhost"
-    assert parser.parse_broker_port() == 1883
+    # defaults from parser
+    assert esp.broker_host == "localhost"
+    assert esp.broker_port == 1883
 
-    assert parser.parse_client_id() == "esp32_sim"
-    # retain_status defaults to True per parser implementation
-    assert parser.parse_retain_status() is True
+    assert esp.client_id == "esp32_sim"
+    assert esp.retain_status is True
 
-    # QoS defaults
-    assert parser.parse_publish_qos_imu() == 0
-    assert parser.parse_publish_qos_gps() == 1
-    # battery default
-    assert parser.parse_publish_qos_batt() == 1
+    # default topics/qos
+    assert esp.imu_in == "sim/imu"
+    assert esp.gps_in == "sim/gps"
+    assert esp.batt_in == "sim/battery"
+    assert esp.imu_out == "sensor/imu"
+    assert esp.gps_out == "sensor/gps"
+    assert esp.batt_out == "sensor/battery"
 
-    # topics defaults
-    assert parser.parse_imu_in() == "sim/imu"
-    assert parser.parse_gps_in() == "sim/gps"
-    assert parser.parse_battery_in() == "sim/battery"
-    assert parser.parse_imu_out() == "sensor/imu"
-    assert parser.parse_gps_out() == "sensor/gps"
-    assert parser.parse_battery_out()  == "sensor/battery"
-    assert parser.parse_status_topic() == "sensor/status"
+    assert esp.qos_imu == 0
+    assert esp.qos_gps == 1
+    assert esp.qos_batt == 1
 
 
-def test_get_qos_map_and_broker_cfg(tmp_path):
-    """Aggregated helper methods should return consistent dicts."""
-    cfg_path = write_cfg(tmp_path, VALID_CONFIG)
-    parser = ESP32Parser(cfg_path)
+def test_broker_host_rejects_non_string():
+    esp = ESP32()
+    with pytest.raises(TypeError):
+        esp.broker_host = 123
+    with pytest.raises(TypeError):
+        esp.broker_host = None
 
-    qos_map = parser.get_qos_map()
-    assert isinstance(qos_map, dict)
-    assert qos_map["imu"] == 0
-    assert qos_map["gps"] == 1
-    assert qos_map["battery"] == 1
 
-    broker = parser.get_broker_cfg()
-    assert broker["host"] == "mosquitto"
-    assert broker["port"] == 1883
+def test_broker_port_rejects_invalid_values():
+    esp = ESP32()
+    with pytest.raises(TypeError):
+        esp.broker_port = "1883"
+    with pytest.raises(TypeError):
+        esp.broker_port = -1
+    with pytest.raises(TypeError):
+        esp.broker_port = 0
+
+
+def test_client_id_rejects_non_string():
+    esp = ESP32()
+    with pytest.raises(TypeError):
+        esp.client_id = 1234
+    with pytest.raises(TypeError):
+        esp.client_id = None
+
+
+def test_retain_status_rejects_non_bool():
+    esp = ESP32()
+    with pytest.raises(TypeError):
+        esp.retain_status = "true"
+    with pytest.raises(TypeError):
+        esp.retain_status = 1
+
+
+def test_topic_setters_reject_invalid():
+    esp = ESP32()
+    with pytest.raises(TypeError):
+        esp.imu_in = ""
+    with pytest.raises(TypeError):
+        esp.gps_in = None
+    with pytest.raises(TypeError):
+        esp.batt_in = 123
+
+
+def test_qos_setters_reject_invalid():
+    esp = ESP32()
+    with pytest.raises(TypeError):
+        esp.qos_imu = -1
+    with pytest.raises(TypeError):
+        esp.qos_gps = "1"
+
+
+def test_validate_schema_and_schema_path_setters():
+    esp = ESP32()
+    with pytest.raises(TypeError):
+        esp.validate_schema = "yes"
+    with pytest.raises(TypeError):
+        esp.schema_path = ""
+
+
+def test_start_without_read_config_raises():
+    esp = ESP32()  # no read_config called -> client is None
+    with pytest.raises(RuntimeError):
+        esp.start()
