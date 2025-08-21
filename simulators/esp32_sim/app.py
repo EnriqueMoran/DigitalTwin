@@ -22,7 +22,7 @@ def _get_log_level() -> int:
         except Exception:
             pass
     debug = os.getenv("DEBUG", "0").lower()
-    if debug in ("1", "true", "yes", "on"):
+    if debug == "1":
         return logging.DEBUG
     return logging.INFO
 
@@ -30,13 +30,22 @@ def _get_log_level() -> int:
 def main():
     # logging: DEBUG if env var SET, else INFO
     logging.basicConfig(level=_get_log_level(), format="%(asctime)s %(levelname)s %(message)s")
-    cfg = "config.ini"
+    cfg = "./simulators/esp32_sim/config.ini"
     sim = ESP32(cfg)
+
+    try:
+        sim.read_config()
+    except Exception as e:
+        LOG.error("Failed to load config from %s: %s", cfg, e)
+        sys.exit(2)
+
 
     def _sig(sig, frame):
         LOG.info("Signal %s received, shutting down", sig)
-        sim.stop()
-        sys.exit(0)
+        try:
+            sim.stop()
+        finally:
+            sys.exit(0)
 
     signal.signal(signal.SIGINT, _sig)
     signal.signal(signal.SIGTERM, _sig)
