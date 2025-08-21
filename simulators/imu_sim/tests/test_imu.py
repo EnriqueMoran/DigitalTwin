@@ -74,6 +74,7 @@ def write_cfg(tmp_path, content: str) -> str:
     p.write_text(content, encoding="utf-8")
     return str(p)
 
+
 def static_motion_provider(t: float):
     """
     World->sensor rotation = I, no linear accel (gravity handled in AccelSim),
