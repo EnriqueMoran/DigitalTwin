@@ -105,17 +105,11 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         lon = payload.get("lon")
         alt = payload.get("alt")
         ts = _parse_ts(payload.get("ts"))
-        course = payload.get("course_deg")
         STATE["latitude"] = lat
         STATE["longitude"] = lon
         STATE["altitude"] = alt
         STATE["gps_signal"] = payload.get("fix")
         STATE["latency"] = LAST_MESSAGE_TIME - ts
-        if course is not None:
-            try:
-                STATE["heading"] = radians(float(course))
-            except Exception:
-                pass
         if _prev_gps:
             dt = ts - _prev_gps["ts"]
             if dt > 0:

@@ -40,7 +40,6 @@ class GPSPublisher:
 
         self.client: Optional[mqtt.Client] = None
         self._running = False
-        self._seq = 0
 
         self.log_messages: bool = False
 
@@ -216,11 +215,13 @@ class GPSPublisher:
                     # Produce one sample at sim_t using scenario-defined motion
                     sample = self.gps.sample(sim_t, motion_provider=self.route.gps_motion)
                     meas = sample.get("meas", {})
-                    # attach sequence and forward ts
-                    meas_out = dict(meas)
-                    meas_out["seq"] = int(self._seq)
-                    meas_out["_forward_ts"] = now_iso()
-                    self._seq += 1
+                    meas_out = {
+                        "lat": meas.get("lat"),
+                        "lon": meas.get("lon"),
+                        "alt": meas.get("alt"),
+                        "fix": meas.get("fix_type"),
+                        "ts": meas.get("ts"),
+                    }
 
                     # Optional validation
                     if self.validate_schema and self._validator is not None:
@@ -245,7 +246,7 @@ class GPSPublisher:
                     # Publish
                     try:
                         self.client.publish(self.topic, json.dumps(meas_out, separators=(",", ":")), qos=self.qos, retain=False)
-                        LOG.debug("Published seq=%s to %s", meas_out.get("seq"), self.topic)
+                        LOG.debug("Published to %s", self.topic)
                     except Exception as e:
                         LOG.warning("Failed to publish GPS payload: %s", e)
 

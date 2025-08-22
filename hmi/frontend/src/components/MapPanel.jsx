@@ -60,7 +60,7 @@ export default function MapPanel({ sensors }) {
       }
     }
 
-    const heading = sensors.heading ?? sensors.cog;
+    const heading = sensors.heading;
     if (heading !== undefined && markerRef.current) {
       const deg = (heading * 180) / Math.PI;
       const rounded = Math.round(deg);
