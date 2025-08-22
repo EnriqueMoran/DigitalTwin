@@ -8,10 +8,10 @@ const boatUrl = '/boat.glb';
 
 export default function BoatViewer({ sensors }) {
   const mountRef = useRef(null);
-  const [follow, setFollow] = useState(true);
-  const followRef = useRef(false);
+  const [live, setLive] = useState(true);
+  const liveRef = useRef(false);
   const sensorsRef = useRef();
-  followRef.current = follow;
+  liveRef.current = live;
   sensorsRef.current = sensors;
 
   useEffect(() => {
@@ -26,7 +26,7 @@ export default function BoatViewer({ sensors }) {
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.addEventListener('start', () => setFollow(false));
+    controls.addEventListener('start', () => setLive(false));
 
     const light = new THREE.DirectionalLight(0xffffff, 1);
     light.position.set(5, 10, 7.5);
@@ -64,7 +64,7 @@ export default function BoatViewer({ sensors }) {
 
     function animate() {
       requestAnimationFrame(animate);
-      if (followRef.current && sensorsRef.current) {
+      if (liveRef.current && sensorsRef.current) {
         const { roll = 0, pitch = 0, heading = 0 } = sensorsRef.current;
         scene.rotation.set(pitch || 0, heading || 0, roll || 0);
       }
@@ -89,10 +89,10 @@ export default function BoatViewer({ sensors }) {
     <div style={{ width: '100%', height: '100%', position: 'relative' }} ref={mountRef}>
       <button
         style={{ position: 'absolute', bottom: 10, left: 10 }}
-        onClick={() => setFollow(true)}
-        disabled={follow}
+        onClick={() => setLive(true)}
+        disabled={live}
       >
-        {follow ? 'Following' : 'Follow'}
+        Live
       </button>
     </div>
   );

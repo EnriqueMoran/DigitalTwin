@@ -16,11 +16,11 @@ const createBoatIcon = (angle = 0) =>
   });
 
 export default function MapPanel({ sensors }) {
-  const mapRef = useRef(null);
+  const [map, setMap] = useState(null);
   const markerRef = useRef(null);
   const initialCentered = useRef(false);
   const lastHeading = useRef(null);
-  const [follow, setFollow] = useState(false);
+  const [follow, setFollow] = useState(true);
 
   useEffect(() => {
     if (!sensors) return;
@@ -29,8 +29,8 @@ export default function MapPanel({ sensors }) {
     if (markerRef.current) {
       markerRef.current.setLatLng(pos);
     }
-    if (follow && mapRef.current) {
-      mapRef.current.setView(pos);
+    if (follow && map) {
+      map.setView(pos);
     }
 
     if (heading !== undefined && markerRef.current) {
@@ -42,16 +42,16 @@ export default function MapPanel({ sensors }) {
       }
     }
 
-    if (!initialCentered.current && mapRef.current && sensors.latitude !== undefined && sensors.longitude !== undefined) {
-      mapRef.current.setView(pos);
+    if (!initialCentered.current && map && sensors.latitude !== undefined && sensors.longitude !== undefined) {
+      map.setView(pos);
       initialCentered.current = true;
     }
-  }, [sensors, follow]);
+  }, [sensors, follow, map]);
 
   const handleCenter = () => {
-    if (mapRef.current) {
+    if (map) {
       const { latitude = 0, longitude = 0 } = sensors || {};
-      mapRef.current.setView([latitude || 0, longitude || 0]);
+      map.setView([latitude || 0, longitude || 0]);
     }
   };
 
@@ -61,8 +61,7 @@ export default function MapPanel({ sensors }) {
   };
 
   useEffect(() => {
-    if (!mapRef.current) return;
-    const map = mapRef.current;
+    if (!map) return;
     const stopFollow = () => setFollow(false);
     map.on('dragstart', stopFollow);
     map.on('zoomstart', stopFollow);
@@ -70,7 +69,7 @@ export default function MapPanel({ sensors }) {
       map.off('dragstart', stopFollow);
       map.off('zoomstart', stopFollow);
     };
-  }, []);
+  }, [map]);
 
   return (
     <div style={{ height: '100%', width: '100%', position: 'relative' }}>
@@ -78,9 +77,7 @@ export default function MapPanel({ sensors }) {
         center={[0, 0]}
         zoom={13}
         style={{ height: '100%', width: '100%' }}
-        whenCreated={(map) => {
-          mapRef.current = map;
-        }}
+        whenCreated={setMap}
       >
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <Marker position={[0, 0]} icon={createBoatIcon()} ref={markerRef} />
