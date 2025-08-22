@@ -14,7 +14,7 @@ export default function SensorData({ sensors = {} }) {
     ['Roll (deg)', fmt(sensors.roll, '', toDeg)],
     ['Pitch (deg)', fmt(sensors.pitch, '', toDeg)],
     ['Estimated speed (m/s)', fmt(sensors.estimated_speed)],
-    ['E.S. Confidence (%)', fmt(sensors.estimated_speed_confidence, '%')],
+    ['E.S. Confidence', fmt(sensors.estimated_speed_confidence, '%')],
     ['True speed (m/s)', fmt(sensors.true_speed)],
     ['Rate of turn (deg/s)', fmt(sensors.rate_of_turn, '', toDeg)],
   ];
