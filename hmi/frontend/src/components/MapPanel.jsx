@@ -32,6 +32,7 @@ export default function MapPanel({ sensors }) {
 
   const [follow, setFollow] = useState(true);
   const [trail, setTrail] = useState([]);
+  const [position, setPosition] = useState(null);
 
   useEffect(() => { sensorsRef.current = sensors; }, [sensors]);
   useEffect(() => { followRef.current = follow; }, [follow]);
@@ -40,22 +41,18 @@ export default function MapPanel({ sensors }) {
 
   useEffect(() => {
     if (!sensors) return;
-    const latRaw = sensors.latitude ?? sensors.lat ?? sensors.y ?? 0;
-    const lonRaw = sensors.longitude ?? sensors.lon ?? sensors.lng ?? sensors.long ?? 0;
-    const lat = Number(latRaw);
-    const lon = Number(lonRaw);
-    const pos = [Number.isFinite(lat) ? lat : 0, Number.isFinite(lon) ? lon : 0];
+    const latRaw = sensors.latitude ?? sensors.lat ?? sensors.y ?? null;
+    const lonRaw = sensors.longitude ?? sensors.lon ?? sensors.lng ?? sensors.long ?? null;
+    const lat = latRaw == null ? NaN : Number(latRaw);
+    const lon = lonRaw == null ? NaN : Number(lonRaw);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || (lat === 0 && lon === 0)) return;
 
-    if (Number.isFinite(lat) && Number.isFinite(lon)) {
-      setTrail((prev) => [...prev, pos]);
-    }
-
-    if (markerRef.current && typeof markerRef.current.setLatLng === 'function') {
-      markerRef.current.setLatLng(pos);
-    }
+    const pos = [lat, lon];
+    setTrail((prev) => [...prev, pos]);
+    setPosition(pos);
 
     const map = mapRef.current;
-    if (map && followRef.current && Number.isFinite(lat) && Number.isFinite(lon)) {
+    if (map && followRef.current) {
       const now = Date.now();
       if (now - lastPanRef.current >= PAN_MIN_MS) {
         map.panTo(pos);
@@ -146,7 +143,7 @@ export default function MapPanel({ sensors }) {
         <MapReadyListener onReady={handleMapReady} />
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <Polyline positions={trail} pathOptions={{ color: 'yellow', dashArray: '4 4' }} />
-        <Marker position={[0, 0]} icon={createBoatIcon()} ref={markerRef} />
+        {position && <Marker position={position} icon={createBoatIcon()} ref={markerRef} />}
       </MapContainer>
 
       <div style={{ position: 'absolute', bottom: 10, left: 10, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 4 }}>
