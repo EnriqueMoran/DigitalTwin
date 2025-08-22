@@ -145,6 +145,7 @@ function Speedometer({ est = 0, real = 0, max = 20 }) {
 }
 
 export default function Widgets({ sensors = {} }) {
+  const toDeg = (r) => (r * 180) / Math.PI;
   return (
     <div>
       <h3>Widgets</h3>
@@ -152,14 +153,23 @@ export default function Widgets({ sensors = {} }) {
         <div className="widget">
           <h4>Heading</h4>
           <Compass heading={sensors.heading} />
+          <div className="value">{((toDeg(sensors.heading ?? 0) + 360) % 360).toFixed(0)}°</div>
         </div>
         <div className="widget">
           <h4>Attitude</h4>
           <AttitudeIndicator roll={sensors.roll} pitch={sensors.pitch} />
+          <div className="value">
+            Roll: {toDeg(sensors.roll ?? 0).toFixed(2)}°<br />
+            Pitch: {toDeg(sensors.pitch ?? 0).toFixed(2)}°
+          </div>
         </div>
         <div className="widget">
           <h4>Speed</h4>
           <Speedometer est={sensors.estimated_speed} real={sensors.true_speed} />
+          <div className="value">
+            Est: {(sensors.estimated_speed ?? 0).toFixed(2)} m/s<br />
+            Real: {(sensors.true_speed ?? 0).toFixed(2)} m/s
+          </div>
           <div className="legend">
             <span><span className="legend-color est"></span>Estimated</span>
             <span><span className="legend-color real"></span>Real</span>
