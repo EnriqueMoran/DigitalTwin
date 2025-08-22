@@ -1,49 +1,72 @@
+import json
 import logging
-import os
+import math
 import signal
+import time
+from pathlib import Path
 import sys
 
-from simulators.imu_sim.lib.mqtt_bridge import IMUPublisher
+sys.path.append(str(Path(__file__).resolve().parents[2]))
+
+import paho.mqtt.client as mqtt
+
+from simulators.scenarios.utils import WAVE_STATES, generate_states, load_scenario, iso_now
 
 LOG = logging.getLogger("imu_sim.app")
 
-
-def _get_log_level() -> int:
-    lvl = os.getenv("LOGLEVEL", "")
-    if lvl:
-        try:
-            return getattr(logging, lvl.upper())
-        except Exception:
-            pass
-    debug = os.getenv("DEBUG", "0").lower()
-    if debug in ("1", "true", "yes", "on"):
-        return logging.DEBUG
-    return logging.INFO
+# Scenario to load for simulation
+SCENARIO_FILE = Path(__file__).resolve().parent.parent / "scenarios" / "sample.json"
 
 
-def main():
-    logging.basicConfig(level=_get_log_level(), format="%(asctime)s %(levelname)s %(message)s")
+def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-    cfg = os.getenv("IMU_CONFIG", "./simulators/imu_sim/config.ini")
-    bridge = IMUPublisher(cfg)
+    scenario = load_scenario(SCENARIO_FILE)
+    wave_cfg = WAVE_STATES.get(scenario.get("wave_state", "calm"), WAVE_STATES["calm"])
 
-    try:
-        bridge.read_and_init_imu()
-    except Exception as e:
-        LOG.error("Failed to init IMU from %s: %s", cfg, e)
-        sys.exit(2)
+    client = mqtt.Client()
+    client.connect("localhost", 1883, 60)
+
+    stop = False
 
     def _sig(sig, frame):
+        nonlocal stop
         LOG.info("Signal %s received, shutting down", sig)
-        try:
-            bridge.stop()
-        finally:
-            sys.exit(0)
+        stop = True
 
     signal.signal(signal.SIGINT, _sig)
     signal.signal(signal.SIGTERM, _sig)
 
-    bridge.start()
+    seq = 0
+    prev_heading = None
+    for t, _lat, _lon, heading, roll, pitch in generate_states(scenario["points"], wave_cfg):
+        if stop:
+            break
+        amp = wave_cfg["amp"]
+        freq = wave_cfg["freq"]
+        roll_rate = 2 * math.pi * freq * amp * math.cos(2 * math.pi * freq * t)
+        pitch_rate = -2 * math.pi * freq * amp * math.sin(2 * math.pi * freq * t)
+        if prev_heading is None:
+            yaw_rate = 0.0
+        else:
+            delta = ((heading - prev_heading + 180.0) % 360.0) - 180.0
+            yaw_rate = delta
+        prev_heading = heading
+        payload = {
+            "ax": 0.0,
+            "ay": 0.0,
+            "az": 1.0,
+            "gx": roll_rate,
+            "gy": pitch_rate,
+            "gz": yaw_rate,
+            "ts": iso_now(),
+            "seq": seq,
+        }
+        client.publish("sim/imu", json.dumps(payload))
+        seq += 1
+        time.sleep(1.0)
+
+    client.disconnect()
 
 
 if __name__ == "__main__":
