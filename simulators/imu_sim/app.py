@@ -1,6 +1,7 @@
 import json
 import logging
 import math
+import os
 import signal
 import time
 from pathlib import Path
@@ -14,8 +15,13 @@ from simulators.scenarios.utils import WAVE_STATES, generate_states, load_scenar
 
 LOG = logging.getLogger("imu_sim.app")
 
-# Scenario to load for simulation
-SCENARIO_FILE = Path(__file__).resolve().parent.parent / "scenarios" / "sample.json"
+# Scenario to load for simulation (overridable via SCENARIO_FILE env var)
+SCENARIO_FILE = Path(
+    os.getenv(
+        "SCENARIO_FILE",
+        Path(__file__).resolve().parent.parent / "scenarios" / "sample.json",
+    )
+)
 
 
 def main() -> None:
@@ -25,7 +31,7 @@ def main() -> None:
     wave_cfg = WAVE_STATES.get(scenario.get("wave_state", "calm"), WAVE_STATES["calm"])
 
     client = mqtt.Client()
-    client.connect("localhost", 1883, 60)
+    client.connect("mosquitto", 1883, 60)
 
     stop = False
 
