@@ -80,6 +80,24 @@ services:
     depends_on:
       - esp32_sim
 
+  hmi_backend:
+    build: ./hmi/backend
+    container_name: hmi_backend
+    ports:
+      - "8001:8000"
+    environment:
+      - MQTT_HOST=mosquitto
+    depends_on:
+      - mosquitto
+
+  hmi_frontend:
+    build: ./hmi/frontend
+    container_name: hmi_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - hmi_backend
+
 volumes:
   mosquitto_data:
   mosquitto_log:
