@@ -8,7 +8,7 @@ const boatUrl = '/boat.glb';
 
 export default function BoatViewer({ sensors }) {
   const mountRef = useRef(null);
-  const [live, setLive] = useState(false);
+  const [live, setLive] = useState(true);
   const liveRef = useRef(false);
   const sensorsRef = useRef();
   liveRef.current = live;

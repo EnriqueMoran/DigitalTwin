@@ -3,7 +3,7 @@ import json
 import os
 import time
 from datetime import datetime
-from math import atan2, cos, radians, sin, sqrt
+from math import atan2, cos, radians, sin, sqrt, pi
 from typing import Dict, Any, Set
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -24,6 +24,7 @@ STATE: Dict[str, Any] = {
     "latitude": None,
     "longitude": None,
     "altitude": None,
+    "yaw": None,
     "heading": None,
     "roll": None,
     "pitch": None,
@@ -53,6 +54,7 @@ MQTT_TOPIC = os.getenv("MQTT_TOPIC", "sensor/#")
 _prev_gps: Dict[str, Any] | None = None
 _prev_imu_ts: float | None = None
 _est_velocity: float = 0.0
+_est_heading: float = 0.0
 
 
 def _parse_ts(ts: str | None) -> float:
@@ -87,8 +89,8 @@ def _on_connect(client: mqtt.Client, userdata, flags, rc):
 
 
 def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
-    global LAST_MESSAGE_TIME, _prev_gps, _prev_imu_ts, _est_velocity, _last_processed
-    now = time.time()
+    global LAST_MESSAGE_TIME, _prev_gps, _prev_imu_ts, _est_velocity, _last_processed, _est_heading
+    now = time.monotonic()
     if now - _last_processed < 0.1:
         return
     _last_processed = now
@@ -97,7 +99,7 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         payload = json.loads(msg.payload.decode())
     except json.JSONDecodeError:
         return
-    LAST_MESSAGE_TIME = now
+    LAST_MESSAGE_TIME = time.time()
 
     if topic == "sensor/gps":
         lat = payload.get("lat")
@@ -124,17 +126,42 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         gx = payload.get("gx")
         gy = payload.get("gy")
         gz = payload.get("gz")
+        mx = payload.get("mx")
+        my = payload.get("my")
+        mz = payload.get("mz")
         ts = _parse_ts(payload.get("ts"))
         STATE["roll"] = atan2(ay, az)
         STATE["pitch"] = atan2(-ax, sqrt(ay * ay + az * az))
         STATE["rate_of_turn"] = gz
         if _prev_imu_ts is not None:
             dt = ts - _prev_imu_ts
-            if dt > 0 and ax is not None:
-                _est_velocity += ax * dt
-                STATE["estimated_speed"] = _est_velocity
-                STATE["estimated_speed_confidence"] = 1.0
+            if dt > 0:
+                if ax is not None:
+                    _est_velocity += ax * dt
+                    STATE["estimated_speed"] = _est_velocity
+                    STATE["estimated_speed_confidence"] = 1.0
+                if gz is not None:
+                    _est_heading = (_est_heading + gz * dt) % (2 * pi)
+                    STATE["yaw"] = _est_heading
         _prev_imu_ts = ts
+        if (
+            mx is not None
+            and my is not None
+            and mz is not None
+            and STATE["roll"] is not None
+            and STATE["pitch"] is not None
+        ):
+            roll = STATE["roll"]
+            pitch = STATE["pitch"]
+            heading_tc = atan2(
+                my * cos(roll) - mz * sin(roll),
+                mx * cos(pitch)
+                + my * sin(roll) * sin(pitch)
+                + mz * cos(roll) * sin(pitch),
+            )
+            STATE["heading"] = heading_tc % (2 * pi)
+        else:
+            STATE["heading"] = STATE.get("yaw")
         STATE["latency"] = LAST_MESSAGE_TIME - ts
 
     elif topic == "sensor/battery":
@@ -149,14 +176,14 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
 async def _broadcast_loop():
     global _last_broadcast
     while True:
-        now = time.time()
+        now = time.monotonic()
         if now - _last_broadcast >= 0.1:
             _last_broadcast = now
             data = {"sensors": STATE, "last_message_time": LAST_MESSAGE_TIME}
             to_remove = []
-            for ws in WEBSOCKETS:
+            for ws in list(WEBSOCKETS):
                 try:
-                    await ws.send_json(data)
+                    await asyncio.wait_for(ws.send_json(data), timeout=0.1)
                 except Exception:
                     to_remove.append(ws)
             for ws in to_remove:
@@ -169,6 +196,7 @@ async def startup_event():
     global MQTT_CLIENT, EVENT_LOOP
     EVENT_LOOP = asyncio.get_running_loop()
     MQTT_CLIENT = mqtt.Client()
+    MQTT_CLIENT.max_queued_messages_set(1)
     MQTT_CLIENT.on_connect = _on_connect
     MQTT_CLIENT.on_message = _on_message
     MQTT_CLIENT.connect(MQTT_HOST, MQTT_PORT, 60)

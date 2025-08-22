@@ -16,30 +16,43 @@ const boatIcon = L.icon({
 export default function MapPanel({ sensors }) {
   const mapRef = useRef(null);
   const markerRef = useRef(null);
+  const lastPos = useRef([0, 0]);
 
   useEffect(() => {
     if (!sensors) return;
     const { latitude = 0, longitude = 0 } = sensors;
     const pos = [latitude || 0, longitude || 0];
+    lastPos.current = pos;
     if (markerRef.current) {
       markerRef.current.setLatLng(pos);
     }
-    if (mapRef.current) {
-      mapRef.current.setView(pos);
-    }
   }, [sensors]);
 
+  const handleCenter = () => {
+    if (mapRef.current) {
+      mapRef.current.setView(lastPos.current);
+    }
+  };
+
   return (
-    <MapContainer
-      center={[0, 0]}
-      zoom={13}
-      style={{ height: '100%', width: '100%' }}
-      whenCreated={(map) => {
-        mapRef.current = map;
-      }}
-    >
-      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      <Marker position={[0, 0]} icon={boatIcon} ref={markerRef} />
-    </MapContainer>
+    <div style={{ height: '100%', width: '100%', position: 'relative' }}>
+      <MapContainer
+        center={[0, 0]}
+        zoom={13}
+        style={{ height: '100%', width: '100%' }}
+        whenCreated={(map) => {
+          mapRef.current = map;
+        }}
+      >
+        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <Marker position={[0, 0]} icon={boatIcon} ref={markerRef} />
+      </MapContainer>
+      <button
+        style={{ position: 'absolute', top: 10, right: 10, zIndex: 1000 }}
+        onClick={handleCenter}
+      >
+        Center
+      </button>
+    </div>
   );
 }
