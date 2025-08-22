@@ -26,10 +26,22 @@ export default function BoatViewer({ sensors }) {
     const light = new THREE.DirectionalLight(0xffffff, 1);
     light.position.set(5, 10, 7.5);
     scene.add(light);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambient);
 
     const loader = new GLTFLoader();
     loader.load(boatUrl, (gltf) => {
       scene.add(gltf.scene);
+      const box = new THREE.Box3().setFromObject(gltf.scene);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const fov = (camera.fov * Math.PI) / 180;
+      let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+      cameraZ *= 1.5;
+      camera.position.set(center.x, center.y, cameraZ);
+      controls.target.copy(center);
+      controls.update();
       animate();
     }, undefined, () => {
       // fallback cube

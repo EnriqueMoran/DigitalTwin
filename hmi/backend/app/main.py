@@ -2,6 +2,8 @@ import asyncio
 import json
 import os
 import time
+from datetime import datetime
+from math import atan2, cos, radians, sin, sqrt
 from typing import Dict, Any, Set
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -44,7 +46,38 @@ EVENT_LOOP: asyncio.AbstractEventLoop | None = None
 
 MQTT_HOST = os.getenv("MQTT_HOST", "mosquitto")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
-MQTT_TOPIC = os.getenv("MQTT_TOPIC", "boat/+/+")
+MQTT_TOPIC = os.getenv("MQTT_TOPIC", "sensor/#")
+
+_prev_gps: Dict[str, Any] | None = None
+_prev_imu_ts: float | None = None
+_est_velocity: float = 0.0
+
+
+def _parse_ts(ts: str | None) -> float:
+    if not ts:
+        return time.time()
+    try:
+        return datetime.fromisoformat(ts).timestamp()
+    except ValueError:
+        return time.time()
+
+
+def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    R = 6371000.0
+    phi1, phi2 = radians(lat1), radians(lat2)
+    dphi = radians(lat2 - lat1)
+    dlambda = radians(lon2 - lon1)
+    a = sin(dphi / 2) ** 2 + cos(phi1) * cos(phi2) * sin(dlambda / 2) ** 2
+    return 2 * R * atan2(sqrt(a), sqrt(1 - a))
+
+
+def _bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    phi1, phi2 = radians(lat1), radians(lat2)
+    dlambda = radians(lon2 - lon1)
+    x = sin(dlambda) * cos(phi2)
+    y = cos(phi1) * sin(phi2) - sin(phi1) * cos(phi2) * cos(dlambda)
+    b = atan2(x, y)
+    return (b + 2 * 3.141592653589793) % (2 * 3.141592653589793)
 
 
 def _on_connect(client: mqtt.Client, userdata, flags, rc):
@@ -52,15 +85,61 @@ def _on_connect(client: mqtt.Client, userdata, flags, rc):
 
 
 def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
-    global LAST_MESSAGE_TIME
+    global LAST_MESSAGE_TIME, _prev_gps, _prev_imu_ts, _est_velocity
+    topic = msg.topic
     try:
         payload = json.loads(msg.payload.decode())
     except json.JSONDecodeError:
         return
     LAST_MESSAGE_TIME = time.time()
-    for key in STATE.keys():
-        if key in payload:
-            STATE[key] = payload[key]
+
+    if topic == "sensor/gps":
+        lat = payload.get("lat")
+        lon = payload.get("lon")
+        alt = payload.get("alt")
+        ts = _parse_ts(payload.get("ts"))
+        STATE["latitude"] = lat
+        STATE["longitude"] = lon
+        STATE["altitude"] = alt
+        STATE["gps_signal"] = payload.get("fix")
+        STATE["latency"] = LAST_MESSAGE_TIME - ts
+        if _prev_gps:
+            dt = ts - _prev_gps["ts"]
+            if dt > 0:
+                dist = _haversine(_prev_gps["lat"], _prev_gps["lon"], lat, lon)
+                STATE["true_speed"] = dist / dt
+                STATE["cog"] = _bearing(_prev_gps["lat"], _prev_gps["lon"], lat, lon)
+        _prev_gps = {"lat": lat, "lon": lon, "ts": ts}
+
+    elif topic == "sensor/imu":
+        ax = payload.get("ax")
+        ay = payload.get("ay")
+        az = payload.get("az")
+        gx = payload.get("gx")
+        gy = payload.get("gy")
+        gz = payload.get("gz")
+        ts = _parse_ts(payload.get("ts"))
+        STATE["roll"] = atan2(ay, az)
+        STATE["pitch"] = atan2(-ax, sqrt(ay * ay + az * az))
+        STATE["rate_of_turn"] = gz
+        if _prev_imu_ts is not None:
+            dt = ts - _prev_imu_ts
+            if dt > 0 and ax is not None:
+                _est_velocity += ax * dt
+                STATE["estimated_speed"] = _est_velocity
+                STATE["estimated_speed_confidence"] = 1.0
+        _prev_imu_ts = ts
+        STATE["latency"] = LAST_MESSAGE_TIME - ts
+
+    elif topic == "sensor/battery":
+        STATE["battery_status"] = payload.get("soc")
+        ts = _parse_ts(payload.get("ts"))
+        STATE["latency"] = LAST_MESSAGE_TIME - ts
+
+    elif topic == "sensor/status":
+        ts = _parse_ts(payload.get("ts"))
+        STATE["latency"] = LAST_MESSAGE_TIME - ts
+
     if EVENT_LOOP:
         data = {"sensors": STATE, "last_message_time": LAST_MESSAGE_TIME}
         for ws in list(WEBSOCKETS):
