@@ -119,11 +119,9 @@ class ScenarioRoute:
         frac = (t - seg["t0"]) / max(seg["t1"] - seg["t0"], 1e-9)
         lat = p0.lat + frac * (p1.lat - p0.lat)
         lon = p0.lon + frac * (p1.lon - p0.lon)
-        # Heading should always point toward the next waypoint from the current
-        # interpolated position rather than staying constant for the entire
-        # segment. Recompute bearing from the current position to the segment
-        # end point so yaw continuously tracks the target waypoint.
-        bearing = self._bearing(lat, lon, p1.lat, p1.lon)
+        # Keep the segment's initial bearing so heading is determined by the IMU
+        # simulator rather than recomputing toward the waypoint on every step.
+        bearing = seg["bearing"]
         return lat, lon, seg["speed"], bearing
 
     def gps_motion(self, t: float) -> Tuple[float, float, float, float, float, float]:
@@ -150,29 +148,31 @@ class ScenarioRoute:
 
     def imu_motion(self, t: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Return (a_lin_world_ms2, omega_world_dps, R_world_to_sensor)."""
-        _, _, _, yaw = self.position(t)
-        yaw_rad = math.radians(yaw)
-
         amp = self.wave_cfg.get("amp", 0.0)
         freq = self.wave_cfg.get("freq", 0.5)
+
         roll = amp * math.sin(2 * math.pi * freq * t)
         pitch = (amp / 2.0) * math.sin(2 * math.pi * freq * t + math.pi / 2)
+        yaw = (amp / 3.0) * math.sin(2 * math.pi * freq * t + math.pi / 3)
 
         # Optional spikes
         if self.wave_cfg.get("spike_prob", 0.0) > 0.0:
             if self._rng.random() < self.wave_cfg["spike_prob"]:
                 roll += self.wave_cfg.get("spike_amp", 0.0) * (1 if self._rng.random() < 0.5 else -1)
                 pitch += self.wave_cfg.get("spike_amp", 0.0) * (1 if self._rng.random() < 0.5 else -1)
+                yaw += (self.wave_cfg.get("spike_amp", 0.0) / 3.0) * (1 if self._rng.random() < 0.5 else -1)
 
         roll_rad = math.radians(roll)
         pitch_rad = math.radians(pitch)
+        yaw_rad = math.radians(yaw)
 
         R = self._euler_to_matrix(roll_rad, pitch_rad, yaw_rad)
 
         # Angular rates (deg/s)
         roll_rate = amp * 2 * math.pi * freq * math.cos(2 * math.pi * freq * t)
         pitch_rate = (amp / 2.0) * 2 * math.pi * freq * math.cos(2 * math.pi * freq * t + math.pi / 2)
-        omega = np.array([roll_rate, pitch_rate, 0.0], dtype=float)
+        yaw_rate = (amp / 3.0) * 2 * math.pi * freq * math.cos(2 * math.pi * freq * t + math.pi / 3)
+        omega = np.array([roll_rate, pitch_rate, yaw_rate], dtype=float)
 
         a_lin = np.zeros(3, dtype=float)
         return a_lin, omega, R
