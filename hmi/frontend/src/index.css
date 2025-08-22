@@ -1,6 +1,8 @@
 body {
   margin: 0;
   font-family: Arial, Helvetica, sans-serif;
+  background: #121212;
+  color: #fff;
 }
 
 .top-nav {
@@ -50,13 +52,25 @@ body {
 }
 .panel {
   flex: 1;
-  border: 1px solid #ccc;
+  border: 1px solid #444;
+  background: #1e1e1e;
   position: relative;
   overflow: hidden;
 }
 .bottom-panels > * {
   flex: 1;
-  border: 1px solid #ccc;
+  border: 1px solid #444;
   padding: 0.5rem;
+  background: #1e1e1e;
   overflow: auto;
+}
+
+.widgets {
+  display: flex;
+  justify-content: space-around;
+  gap: 1rem;
+}
+
+.widget-canvas {
+  background: #333;
 }
