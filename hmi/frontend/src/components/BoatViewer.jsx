@@ -9,6 +9,10 @@ const boatUrl = '/boat.glb';
 export default function BoatViewer({ sensors }) {
   const mountRef = useRef(null);
   const [live, setLive] = useState(false);
+  const liveRef = useRef(false);
+  const sensorsRef = useRef();
+  liveRef.current = live;
+  sensorsRef.current = sensors;
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -22,6 +26,7 @@ export default function BoatViewer({ sensors }) {
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
+    controls.addEventListener('start', () => setLive(false));
 
     const light = new THREE.DirectionalLight(0xffffff, 1);
     light.position.set(5, 10, 7.5);
@@ -30,32 +35,37 @@ export default function BoatViewer({ sensors }) {
     scene.add(ambient);
 
     const loader = new GLTFLoader();
-    loader.load(boatUrl, (gltf) => {
-      scene.add(gltf.scene);
-      const box = new THREE.Box3().setFromObject(gltf.scene);
-      const center = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z);
-      const fov = (camera.fov * Math.PI) / 180;
-      let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-      cameraZ *= 1.5;
-      camera.position.set(center.x, center.y, cameraZ);
-      controls.target.copy(center);
-      controls.update();
-      animate();
-    }, undefined, () => {
-      // fallback cube
-      const geometry = new THREE.BoxGeometry();
-      const material = new THREE.MeshNormalMaterial();
-      const cube = new THREE.Mesh(geometry, material);
-      scene.add(cube);
-      animate();
-    });
+    loader.load(
+      boatUrl,
+      (gltf) => {
+        scene.add(gltf.scene);
+        const box = new THREE.Box3().setFromObject(gltf.scene);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const fov = (camera.fov * Math.PI) / 180;
+        let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+        cameraZ *= 1.5;
+        camera.position.set(center.x, center.y, cameraZ);
+        controls.target.copy(center);
+        controls.update();
+        animate();
+      },
+      undefined,
+      () => {
+        // fallback cube
+        const geometry = new THREE.BoxGeometry();
+        const material = new THREE.MeshNormalMaterial();
+        const cube = new THREE.Mesh(geometry, material);
+        scene.add(cube);
+        animate();
+      }
+    );
 
     function animate() {
       requestAnimationFrame(animate);
-      if (live && sensors) {
-        const { roll = 0, pitch = 0, heading = 0 } = sensors;
+      if (liveRef.current && sensorsRef.current) {
+        const { roll = 0, pitch = 0, heading = 0 } = sensorsRef.current;
         scene.rotation.set(pitch || 0, heading || 0, roll || 0);
       }
       controls.update();
@@ -73,13 +83,13 @@ export default function BoatViewer({ sensors }) {
       window.removeEventListener('resize', handleResize);
       mount.removeChild(renderer.domElement);
     };
-  }, [live, sensors]);
+  }, []);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }} ref={mountRef}>
       <button
         style={{ position: 'absolute', bottom: 10, left: 10 }}
-        onClick={() => setLive(!live)}
+        onClick={() => setLive((v) => !v)}
       >
         {live ? 'Stop' : 'Live'}
       </button>

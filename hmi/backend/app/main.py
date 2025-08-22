@@ -43,6 +43,8 @@ LAST_MESSAGE_TIME: float | None = None
 WEBSOCKETS: Set[WebSocket] = set()
 MQTT_CLIENT: mqtt.Client | None = None
 EVENT_LOOP: asyncio.AbstractEventLoop | None = None
+_last_broadcast: float = 0.0
+_last_processed: float = 0.0
 
 MQTT_HOST = os.getenv("MQTT_HOST", "mosquitto")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
@@ -85,13 +87,17 @@ def _on_connect(client: mqtt.Client, userdata, flags, rc):
 
 
 def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
-    global LAST_MESSAGE_TIME, _prev_gps, _prev_imu_ts, _est_velocity
+    global LAST_MESSAGE_TIME, _prev_gps, _prev_imu_ts, _est_velocity, _last_processed
+    now = time.time()
+    if now - _last_processed < 0.1:
+        return
+    _last_processed = now
     topic = msg.topic
     try:
         payload = json.loads(msg.payload.decode())
     except json.JSONDecodeError:
         return
-    LAST_MESSAGE_TIME = time.time()
+    LAST_MESSAGE_TIME = now
 
     if topic == "sensor/gps":
         lat = payload.get("lat")
@@ -140,24 +146,22 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         ts = _parse_ts(payload.get("ts"))
         STATE["latency"] = LAST_MESSAGE_TIME - ts
 
-    if EVENT_LOOP:
-        data = {"sensors": STATE, "last_message_time": LAST_MESSAGE_TIME}
-        for ws in list(WEBSOCKETS):
-            asyncio.run_coroutine_threadsafe(ws.send_json(data), EVENT_LOOP)
-
-
 async def _broadcast_loop():
+    global _last_broadcast
     while True:
-        data = {"sensors": STATE, "last_message_time": LAST_MESSAGE_TIME}
-        to_remove = []
-        for ws in WEBSOCKETS:
-            try:
-                await ws.send_json(data)
-            except Exception:
-                to_remove.append(ws)
-        for ws in to_remove:
-            WEBSOCKETS.discard(ws)
-        await asyncio.sleep(1)
+        now = time.time()
+        if now - _last_broadcast >= 0.1:
+            _last_broadcast = now
+            data = {"sensors": STATE, "last_message_time": LAST_MESSAGE_TIME}
+            to_remove = []
+            for ws in WEBSOCKETS:
+                try:
+                    await ws.send_json(data)
+                except Exception:
+                    to_remove.append(ws)
+            for ws in to_remove:
+                WEBSOCKETS.discard(ws)
+        await asyncio.sleep(0.01)
 
 
 @app.on_event("startup")
