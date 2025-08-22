@@ -74,3 +74,25 @@ body {
 .widget-canvas {
   background: #333;
 }
+
+.widget {
+  text-align: center;
+}
+
+.legend {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.legend-color {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 0.25rem;
+}
+
+.legend-color.est { background: orange; }
+.legend-color.real { background: lime; }

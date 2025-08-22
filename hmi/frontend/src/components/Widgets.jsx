@@ -149,9 +149,22 @@ export default function Widgets({ sensors = {} }) {
     <div>
       <h3>Widgets</h3>
       <div className="widgets">
-        <Compass heading={sensors.heading} />
-        <AttitudeIndicator roll={sensors.roll} pitch={sensors.pitch} />
-        <Speedometer est={sensors.estimated_speed} real={sensors.true_speed} />
+        <div className="widget">
+          <h4>Heading</h4>
+          <Compass heading={sensors.heading} />
+        </div>
+        <div className="widget">
+          <h4>Attitude</h4>
+          <AttitudeIndicator roll={sensors.roll} pitch={sensors.pitch} />
+        </div>
+        <div className="widget">
+          <h4>Speed</h4>
+          <Speedometer est={sensors.estimated_speed} real={sensors.true_speed} />
+          <div className="legend">
+            <span><span className="legend-color est"></span>Estimated</span>
+            <span><span className="legend-color real"></span>Real</span>
+          </div>
+        </div>
       </div>
     </div>
   );
