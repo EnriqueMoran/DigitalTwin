@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 
 import paho.mqtt.client as mqtt
-from jsonschema import validate
+from jsonschema import Draft7Validator
 from jsonschema.exceptions import ValidationError
 
 from simulators.gps_sim.lib.gps_sim import NEOM8N
@@ -36,6 +36,7 @@ class GPSPublisher:
         self.validate_schema: bool = False
         self.schema_path: Optional[Path] = None
         self._schema: Optional[Dict[str, Any]] = None
+        self._validator: Optional[Draft7Validator] = None
 
         self.client: Optional[mqtt.Client] = None
         self._running = False
@@ -134,6 +135,7 @@ class GPSPublisher:
             return
 
         self._schema = schema
+        self._validator = Draft7Validator(schema)
         LOG.info("Loaded schema for topic %s from %s", self.topic, self.schema_path)
 
     def read_and_init_gps(self, seed: Optional[int] = 1) -> None:
@@ -221,15 +223,15 @@ class GPSPublisher:
                     self._seq += 1
 
                     # Optional validation
-                    if self.validate_schema and self._schema is not None:
+                    if self.validate_schema and self._validator is not None:
                         try:
-                            validate(instance=meas_out, schema=self._schema)
+                            self._validator.validate(meas_out)
                         except ValidationError as ve:
                             LOG.warning("Outgoing GPS payload failed schema validation: %s", ve.message)
-                            # skip this publish (small sleep to avoid busy-loop)
+                            # skip this publish (sleep until next tick to avoid busy-loop)
                             t_next += dt_pub
                             sim_t += dt_pub
-                            time.sleep(0.0005)
+                            time.sleep(dt_pub)
                             continue
 
                     # Optional logging of outgoing message
@@ -254,8 +256,10 @@ class GPSPublisher:
                     t_next += dt_pub
                     sim_t += dt_pub
                 else:
-                    # sleep a tiny bit to avoid busy-loop
-                    time.sleep(0.0005)
+                    # sleep until next scheduled publish to avoid busy-loop
+                    sleep_dur = t_next - now_t
+                    if sleep_dur > 0:
+                        time.sleep(min(sleep_dur, dt_pub))
         except KeyboardInterrupt:
             LOG.info("Keyboard interrupt received; stopping")
         finally:
