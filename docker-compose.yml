@@ -1,8 +1,5 @@
 version: "3.8"
 
-x-logging: &default-logging
-  driver: "${LOG_DRIVER:-json-file}"
-
 services:
   mosquitto:
     image: eclipse-mosquitto:2.0
@@ -14,7 +11,8 @@ services:
       - ./mosquitto/config:/mosquitto/config:ro
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log
-    logging: *default-logging
+    logging:
+      driver: "${MOSQUITTO_LOG_DRIVER:-json-file}"
 
   esp32_sim:
     build:
@@ -30,7 +28,8 @@ services:
       - ESP32_SIM_CONFIG=/app/simulators/esp32_sim/config.ini
     depends_on:
       - mosquitto
-    logging: *default-logging
+    logging:
+      driver: "${ESP32_SIM_LOG_DRIVER:-json-file}"
 
   imu_sim:
     build:
@@ -47,7 +46,8 @@ services:
       - MPLBACKEND=TkAgg
     depends_on:
       - mosquitto
-    logging: *default-logging
+    logging:
+      driver: "${IMU_SIM_LOG_DRIVER:-json-file}"
 
   gps_sim:
     build:
@@ -62,7 +62,8 @@ services:
       - RUN_TESTS=0
     depends_on:
       - mosquitto
-    logging: *default-logging
+    logging:
+      driver: "${GPS_SIM_LOG_DRIVER:-json-file}"
 
   battery_sim:
     build:
@@ -77,7 +78,8 @@ services:
       - RUN_TESTS=0
     depends_on:
       - mosquitto
-    logging: *default-logging
+    logging:
+      driver: "${BATTERY_SIM_LOG_DRIVER:-json-file}"
 
   ground:
     build: ./ground
@@ -87,7 +89,8 @@ services:
     restart: unless-stopped
     depends_on:
       - esp32_sim
-    logging: *default-logging
+    logging:
+      driver: "${GROUND_LOG_DRIVER:-json-file}"
 
   hmi_backend:
     build: ./hmi/backend
@@ -98,7 +101,8 @@ services:
       - MQTT_HOST=mosquitto
     depends_on:
       - mosquitto
-    logging: *default-logging
+    logging:
+      driver: "${HMI_BACKEND_LOG_DRIVER:-json-file}"
 
   hmi_frontend:
     build: ./hmi/frontend
@@ -107,7 +111,8 @@ services:
       - "3000:80"
     depends_on:
       - hmi_backend
-    logging: *default-logging
+    logging:
+      driver: "${HMI_FRONTEND_LOG_DRIVER:-json-file}"
 
 volumes:
   mosquitto_data:
