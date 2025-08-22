@@ -1,16 +1,22 @@
 export default function SensorData({ sensors = {} }) {
+  const toDeg = (r) => (r !== undefined && r !== null ? (r * 180 / Math.PI).toFixed(2) : null);
+  const fmt = (v, unit = '', transform) => {
+    if (v === undefined || v === null) return 'Null';
+    const val = transform ? transform(v) : v;
+    return `${val}${unit}`;
+  };
+
   const fields = [
-    ['Latitude', sensors.latitude],
-    ['Longitude', sensors.longitude],
-    ['Altitude', sensors.altitude],
-    ['Heading (yaw)', sensors.yaw],
-    ['Heading (tilt-compensated)', sensors.heading],
-    ['Roll', sensors.roll],
-    ['Pitch', sensors.pitch],
-    ['Estimated speed', sensors.estimated_speed],
-    ['Estimated speed confidence', sensors.estimated_speed_confidence],
-    ['True speed', sensors.true_speed],
-    ['Rate of turn', sensors.rate_of_turn],
+    ['Latitude (deg)', fmt(sensors.latitude)],
+    ['Longitude (deg)', fmt(sensors.longitude)],
+    ['Altitude (m)', fmt(sensors.altitude)],
+    ['Heading (deg)', fmt(sensors.heading, '', toDeg)],
+    ['Roll (deg)', fmt(sensors.roll, '', toDeg)],
+    ['Pitch (deg)', fmt(sensors.pitch, '', toDeg)],
+    ['Estimated speed (m/s)', fmt(sensors.estimated_speed)],
+    ['E.S. Confidence (%)', fmt(sensors.estimated_speed_confidence, '%')],
+    ['True speed (m/s)', fmt(sensors.true_speed)],
+    ['Rate of turn (deg/s)', fmt(sensors.rate_of_turn, '', toDeg)],
   ];
   return (
     <div>
@@ -20,7 +26,7 @@ export default function SensorData({ sensors = {} }) {
           {fields.map(([label, value]) => (
             <tr key={label}>
               <td>{label}</td>
-              <td>{value !== undefined && value !== null ? value : 'Null'}</td>
+              <td>{value}</td>
             </tr>
           ))}
         </tbody>

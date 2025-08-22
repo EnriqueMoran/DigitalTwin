@@ -24,7 +24,6 @@ STATE: Dict[str, Any] = {
     "latitude": None,
     "longitude": None,
     "altitude": None,
-    "yaw": None,
     "heading": None,
     "roll": None,
     "pitch": None,
@@ -139,10 +138,9 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
                 if ax is not None:
                     _est_velocity += ax * dt
                     STATE["estimated_speed"] = _est_velocity
-                    STATE["estimated_speed_confidence"] = 1.0
+                    STATE["estimated_speed_confidence"] = 100.0
                 if gz is not None:
                     _est_heading = (_est_heading + gz * dt) % (2 * pi)
-                    STATE["yaw"] = _est_heading
         _prev_imu_ts = ts
         if (
             mx is not None
@@ -161,11 +159,15 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
             )
             STATE["heading"] = heading_tc % (2 * pi)
         else:
-            STATE["heading"] = STATE.get("yaw")
+            STATE["heading"] = _est_heading
         STATE["latency"] = LAST_MESSAGE_TIME - ts
 
     elif topic == "sensor/battery":
-        STATE["battery_status"] = payload.get("soc")
+        soc = payload.get("soc")
+        if soc is not None:
+            if soc <= 1:
+                soc *= 100.0
+            STATE["battery_status"] = soc
         ts = _parse_ts(payload.get("ts"))
         STATE["latency"] = LAST_MESSAGE_TIME - ts
 

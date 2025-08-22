@@ -16,13 +16,11 @@ const boatIcon = L.icon({
 export default function MapPanel({ sensors }) {
   const mapRef = useRef(null);
   const markerRef = useRef(null);
-  const lastPos = useRef([0, 0]);
 
   useEffect(() => {
     if (!sensors) return;
     const { latitude = 0, longitude = 0 } = sensors;
     const pos = [latitude || 0, longitude || 0];
-    lastPos.current = pos;
     if (markerRef.current) {
       markerRef.current.setLatLng(pos);
     }
@@ -30,7 +28,8 @@ export default function MapPanel({ sensors }) {
 
   const handleCenter = () => {
     if (mapRef.current) {
-      mapRef.current.setView(lastPos.current);
+      const { latitude = 0, longitude = 0 } = sensors || {};
+      mapRef.current.setView([latitude || 0, longitude || 0]);
     }
   };
 
@@ -48,7 +47,7 @@ export default function MapPanel({ sensors }) {
         <Marker position={[0, 0]} icon={boatIcon} ref={markerRef} />
       </MapContainer>
       <button
-        style={{ position: 'absolute', top: 10, right: 10, zIndex: 1000 }}
+        style={{ position: 'absolute', bottom: 10, left: 10, zIndex: 1000 }}
         onClick={handleCenter}
       >
         Center
