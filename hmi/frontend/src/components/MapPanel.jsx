@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -31,6 +31,7 @@ export default function MapPanel({ sensors }) {
   const followRef = useRef(true);
 
   const [follow, setFollow] = useState(true);
+  const [trail, setTrail] = useState([]);
 
   useEffect(() => { sensorsRef.current = sensors; }, [sensors]);
   useEffect(() => { followRef.current = follow; }, [follow]);
@@ -44,6 +45,10 @@ export default function MapPanel({ sensors }) {
     const lat = Number(latRaw);
     const lon = Number(lonRaw);
     const pos = [Number.isFinite(lat) ? lat : 0, Number.isFinite(lon) ? lon : 0];
+
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      setTrail((prev) => [...prev, pos]);
+    }
 
     if (markerRef.current && typeof markerRef.current.setLatLng === 'function') {
       markerRef.current.setLatLng(pos);
@@ -140,6 +145,7 @@ export default function MapPanel({ sensors }) {
       <MapContainer center={[0, 0]} zoom={13} style={{ height: '100%', width: '100%' }}>
         <MapReadyListener onReady={handleMapReady} />
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <Polyline positions={trail} pathOptions={{ color: 'yellow', dashArray: '4 4' }} />
         <Marker position={[0, 0]} icon={createBoatIcon()} ref={markerRef} />
       </MapContainer>
 
