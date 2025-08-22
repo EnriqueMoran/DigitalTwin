@@ -1,14 +1,15 @@
 export default function SystemStatus({ sensors = {} }) {
-  const fmt = (v, unit = '', transform) => {
+  const fmt = (v, unit = '', transform, decimals) => {
     if (v === undefined || v === null) return 'Null';
-    const val = transform ? transform(v) : v;
+    let val = transform ? transform(v) : v;
+    if (decimals !== undefined) val = parseFloat(Number(val).toFixed(decimals));
     return `${val}${unit}`;
   };
   const toPercent = (v) => (v <= 1 ? (v * 100).toFixed(0) : v.toFixed(0));
   const fields = [
     ['Connection state', sensors.connection_state ?? 'Null'],
     ['IMU temperature (deg)', fmt(sensors.imu_temperature)],
-    ['Latency (s)', fmt(sensors.latency)],
+    ['Latency (s)', fmt(sensors.latency, '', null, 3)],
     ['Battery status (%)', fmt(sensors.battery_status, '%', toPercent)],
     ['GPS signal (fix)', fmt(sensors.gps_signal)],
     ['Uptime (s)', fmt(sensors.uptime)],

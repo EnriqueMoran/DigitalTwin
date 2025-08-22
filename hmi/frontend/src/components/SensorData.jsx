@@ -1,22 +1,23 @@
 export default function SensorData({ sensors = {} }) {
-  const toDeg = (r) => (r !== undefined && r !== null ? (r * 180 / Math.PI).toFixed(2) : null);
-  const fmt = (v, unit = '', transform) => {
+  const toDeg = (r) => (r !== undefined && r !== null ? (r * 180) / Math.PI : null);
+  const fmt = (v, unit = '', transform, decimals) => {
     if (v === undefined || v === null) return 'Null';
-    const val = transform ? transform(v) : v;
+    let val = transform ? transform(v) : v;
+    if (decimals !== undefined) val = parseFloat(Number(val).toFixed(decimals));
     return `${val}${unit}`;
   };
 
   const fields = [
-    ['Latitude (deg)', fmt(sensors.latitude)],
-    ['Longitude (deg)', fmt(sensors.longitude)],
-    ['Altitude (m)', fmt(sensors.altitude)],
-    ['Heading (deg)', fmt(sensors.heading, '', toDeg)],
-    ['Roll (deg)', fmt(sensors.roll, '', toDeg)],
-    ['Pitch (deg)', fmt(sensors.pitch, '', toDeg)],
-    ['Estimated speed (m/s)', fmt(sensors.estimated_speed)],
+    ['Latitude (deg)', fmt(sensors.latitude, '', null, 6)],
+    ['Longitude (deg)', fmt(sensors.longitude, '', null, 6)],
+    ['Altitude (m)', fmt(sensors.altitude, '', null, 2)],
+    ['Heading (deg)', fmt(sensors.heading, '', toDeg, 0)],
+    ['Roll (deg)', fmt(sensors.roll, '', toDeg, 2)],
+    ['Pitch (deg)', fmt(sensors.pitch, '', toDeg, 2)],
+    ['Estimated speed (m/s)', fmt(sensors.estimated_speed, '', null, 3)],
     ['E.S. Confidence', fmt(sensors.estimated_speed_confidence, '%')],
-    ['True speed (m/s)', fmt(sensors.true_speed)],
-    ['Rate of turn (deg/s)', fmt(sensors.rate_of_turn, '', toDeg)],
+    ['True speed (m/s)', fmt(sensors.true_speed, '', null, 3)],
+    ['Rate of turn (deg/s)', fmt(sensors.rate_of_turn, '', toDeg, 2)],
   ];
   return (
     <div>

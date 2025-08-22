@@ -167,8 +167,8 @@ export default function Widgets({ sensors = {} }) {
           <h4>Speed</h4>
           <Speedometer est={sensors.estimated_speed} real={sensors.true_speed} />
           <div className="value">
-            Est: {(sensors.estimated_speed ?? 0).toFixed(2)} m/s<br />
-            Real: {(sensors.true_speed ?? 0).toFixed(2)} m/s
+            Est: {parseFloat((sensors.estimated_speed ?? 0).toFixed(3))} m/s<br />
+            Real: {parseFloat((sensors.true_speed ?? 0).toFixed(3))} m/s
           </div>
           <div className="legend">
             <span><span className="legend-color est"></span>Estimated</span>
