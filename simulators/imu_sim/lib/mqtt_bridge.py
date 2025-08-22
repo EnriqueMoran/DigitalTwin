@@ -12,6 +12,7 @@ from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 
 from simulators.imu_sim.lib.imu_sim import MPU9250
+from simulators.route import ScenarioRoute
 
 LOG = logging.getLogger("imu_sim.bridge")
 
@@ -43,6 +44,14 @@ class IMUPublisher:
 
         self._load_mqtt_config()
 
+        # Load navigation scenario defining motion and sea state
+        scen_path = Path(__file__).resolve().parents[2] / "scenarios" / "main_scenario.json"
+        try:
+            self.route = ScenarioRoute(scen_path)
+            LOG.info("Loaded scenario from %s", scen_path)
+        except Exception as e:
+            LOG.error("Failed to load scenario %s: %s", scen_path, e)
+            raise
 
     def _load_mqtt_config(self) -> None:
         import configparser
@@ -193,6 +202,8 @@ class IMUPublisher:
         t_next_gyro = time.time()
         last_acc = [0.0, 0.0, 0.0]
         last_gyro = [0.0, 0.0, 0.0]
+        sim_t_acc = 0.0
+        sim_t_gyro = 0.0
 
         self._running = True
         LOG.info("Starting IMU publisher: accel ODR=%.1fHz gyro ODR=%.1fHz -> topic %s (qos=%d)",
@@ -203,14 +214,18 @@ class IMUPublisher:
                 now_t = time.time()
 
                 if now_t >= t_next_acc:
-                    _, a_g = self.imu.sample_accel(np.zeros(3), np.eye(3))
+                    a_lin, omega, R = self.route.imu_motion(sim_t_acc)
+                    _, a_g = self.imu.sample_accel(a_lin, R)
                     last_acc = [float(a_g[0]), float(a_g[1]), float(a_g[2])]
                     t_next_acc += dt_acc
+                    sim_t_acc += dt_acc
 
                 if now_t >= t_next_gyro:
-                    _, w = self.imu.sample_gyro(np.zeros(3), np.eye(3))
+                    a_lin, omega, R = self.route.imu_motion(sim_t_gyro)
+                    _, w = self.imu.sample_gyro(omega, R)
                     last_gyro = [float(w[0]), float(w[1]), float(w[2])]
                     t_next_gyro += dt_gyro
+                    sim_t_gyro += dt_gyro
 
                 payload = {
                     "ax": last_acc[0],

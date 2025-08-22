@@ -11,6 +11,7 @@ from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 
 from simulators.gps_sim.lib.gps_sim import NEOM8N
+from simulators.route import ScenarioRoute
 
 LOG = logging.getLogger("gps_sim.bridge")
 
@@ -43,6 +44,15 @@ class GPSPublisher:
         self.log_messages: bool = False
 
         self._load_mqtt_config()
+
+        # Load navigation scenario defining route and wave state
+        scen_path = Path(__file__).resolve().parents[2] / "scenarios" / "main_scenario.json"
+        try:
+            self.route = ScenarioRoute(scen_path)
+            LOG.info("Loaded scenario from %s", scen_path)
+        except Exception as e:
+            LOG.error("Failed to load scenario %s: %s", scen_path, e)
+            raise
 
     def _load_mqtt_config(self) -> None:
         import configparser
@@ -201,8 +211,8 @@ class GPSPublisher:
             while self._running:
                 now_t = time.time()
                 if now_t >= t_next:
-                    # Produce one sample at sim_t (simulated time advances by dt_pub per publish)
-                    sample = self.gps.sample(sim_t)
+                    # Produce one sample at sim_t using scenario-defined motion
+                    sample = self.gps.sample(sim_t, motion_provider=self.route.gps_motion)
                     meas = sample.get("meas", {})
                     # attach sequence and forward ts
                     meas_out = dict(meas)
