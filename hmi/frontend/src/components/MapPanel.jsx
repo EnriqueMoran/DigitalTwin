@@ -20,7 +20,7 @@ export default function MapPanel({ sensors }) {
   const markerRef = useRef(null);
   const initialCentered = useRef(false);
   const lastHeading = useRef(null);
-  const [live, setLive] = useState(false);
+  const [follow, setFollow] = useState(false);
 
   useEffect(() => {
     if (!sensors) return;
@@ -29,13 +29,13 @@ export default function MapPanel({ sensors }) {
     if (markerRef.current) {
       markerRef.current.setLatLng(pos);
     }
-    if (live && mapRef.current) {
+    if (follow && mapRef.current) {
       mapRef.current.setView(pos);
     }
 
     if (heading !== undefined && markerRef.current) {
       const deg = (heading * 180) / Math.PI;
-      const rounded = Math.round(deg / 5) * 5;
+      const rounded = Math.round(deg);
       if (lastHeading.current !== rounded) {
         markerRef.current.setIcon(createBoatIcon(rounded));
         lastHeading.current = rounded;
@@ -46,7 +46,7 @@ export default function MapPanel({ sensors }) {
       mapRef.current.setView(pos);
       initialCentered.current = true;
     }
-  }, [sensors, live]);
+  }, [sensors, follow]);
 
   const handleCenter = () => {
     if (mapRef.current) {
@@ -55,20 +55,20 @@ export default function MapPanel({ sensors }) {
     }
   };
 
-  const handleLive = () => {
-    setLive(true);
+  const handleFollow = () => {
+    setFollow(true);
     handleCenter();
   };
 
   useEffect(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
-    const stopLive = () => setLive(false);
-    map.on('dragstart', stopLive);
-    map.on('zoomstart', stopLive);
+    const stopFollow = () => setFollow(false);
+    map.on('dragstart', stopFollow);
+    map.on('zoomstart', stopFollow);
     return () => {
-      map.off('dragstart', stopLive);
-      map.off('zoomstart', stopLive);
+      map.off('dragstart', stopFollow);
+      map.off('zoomstart', stopFollow);
     };
   }, []);
 
@@ -89,7 +89,9 @@ export default function MapPanel({ sensors }) {
         style={{ position: 'absolute', bottom: 10, left: 10, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 4 }}
       >
         <button onClick={handleCenter}>Center</button>
-        <button onClick={handleLive}>Live</button>
+        <button onClick={handleFollow} disabled={follow}>
+          {follow ? 'Following' : 'Follow'}
+        </button>
       </div>
     </div>
   );
