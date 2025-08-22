@@ -119,7 +119,12 @@ class ScenarioRoute:
         frac = (t - seg["t0"]) / max(seg["t1"] - seg["t0"], 1e-9)
         lat = p0.lat + frac * (p1.lat - p0.lat)
         lon = p0.lon + frac * (p1.lon - p0.lon)
-        return lat, lon, seg["speed"], seg["bearing"]
+        # Heading should always point toward the next waypoint from the current
+        # interpolated position rather than staying constant for the entire
+        # segment. Recompute bearing from the current position to the segment
+        # end point so yaw continuously tracks the target waypoint.
+        bearing = self._bearing(lat, lon, p1.lat, p1.lon)
+        return lat, lon, seg["speed"], bearing
 
     def gps_motion(self, t: float) -> Tuple[float, float, float, float, float, float]:
         lat, lon, spd, bearing = self.position(t)
