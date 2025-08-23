@@ -132,14 +132,22 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         my = payload.get("my")
         mz = payload.get("mz")
         ts = _parse_ts(payload.get("ts"))
-        STATE["roll"] = atan2(ay, az)
-        STATE["pitch"] = atan2(-ax, sqrt(ay * ay + az * az))
+
+        if ax is not None and ay is not None and az is not None:
+            STATE["roll"] = atan2(ay, az)
+            STATE["pitch"] = atan2(-ax, sqrt(ay * ay + az * az))
         STATE["rate_of_turn"] = gz
         if _prev_imu_ts is not None:
             dt = ts - _prev_imu_ts
             if dt > 0:
-                if ax is not None:
-                    _est_velocity += ax * dt
+                if ax is not None and ay is not None and az is not None:
+                    g = 9.80665
+                    roll = STATE.get("roll") or 0.0
+                    pitch = STATE.get("pitch") or 0.0
+                    gx_s = -g * sin(pitch)
+                    ax_lin = ax * g - gx_s
+                    # Integrate forward (body x) acceleration
+                    _est_velocity += ax_lin * dt
                     STATE["estimated_speed"] = _est_velocity
                     STATE["estimated_speed_confidence"] = 100.0
                 if gz is not None:
