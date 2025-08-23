@@ -60,6 +60,7 @@ class ScenarioRoute:
 
         # Wave configuration
         self.wave_cfg = self._wave_config(self.wave_state)
+        # Use python random.Random for reproducible simple spikes (seed fixed here)
         self._rng = random.Random(0)
 
     @staticmethod
@@ -147,32 +148,68 @@ class ScenarioRoute:
         ], dtype=float)
 
     def imu_motion(self, t: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Return (a_lin_world_ms2, omega_world_dps, R_world_to_sensor)."""
-        amp = self.wave_cfg.get("amp", 0.0)
-        freq = self.wave_cfg.get("freq", 0.5)
+        """
+        Return (a_lin_world_ms2, omega_world_dps, R_world_to_sensor).
 
-        roll = amp * math.sin(2 * math.pi * freq * t)
-        pitch = (amp / 2.0) * math.sin(2 * math.pi * freq * t + math.pi / 2)
-        yaw = (amp / 3.0) * math.sin(2 * math.pi * freq * t + math.pi / 3)
+        Default behaviour:
+          - roll and pitch are driven by the wave configuration (sinusoids).
+          - heading (yaw) is kept approximately constant (the base heading is taken
+            from the current route segment bearing when available).
+          - a small yaw oscillation (wave-induced) is added to the base heading.
+          - rare spikes (if configured) add impulsive disturbances to roll/pitch/yaw.
+        """
+        amp = float(self.wave_cfg.get("amp", 0.0))      # degrees amplitude for roll
+        freq = float(self.wave_cfg.get("freq", 0.5))   # Hz
+        spike_prob = float(self.wave_cfg.get("spike_prob", 0.0))
+        spike_amp = float(self.wave_cfg.get("spike_amp", 0.0))
 
-        # Optional spikes
-        if self.wave_cfg.get("spike_prob", 0.0) > 0.0:
-            if self._rng.random() < self.wave_cfg["spike_prob"]:
-                roll += self.wave_cfg.get("spike_amp", 0.0) * (1 if self._rng.random() < 0.5 else -1)
-                pitch += self.wave_cfg.get("spike_amp", 0.0) * (1 if self._rng.random() < 0.5 else -1)
-                yaw += (self.wave_cfg.get("spike_amp", 0.0) / 3.0) * (1 if self._rng.random() < 0.5 else -1)
+        # Determine base heading from route if available, otherwise 0.0 deg
+        try:
+            seg, _ = self._segment_at(t)
+            base_heading_deg = float(seg.get("bearing", 0.0))
+        except Exception:
+            base_heading_deg = 0.0
 
-        roll_rad = math.radians(roll)
-        pitch_rad = math.radians(pitch)
-        yaw_rad = math.radians(yaw)
+        # Roll & pitch wave sinusoids (degrees)
+        roll_deg = amp * math.sin(2.0 * math.pi * freq * t)
+        pitch_deg = (amp / 2.0) * math.sin(2.0 * math.pi * freq * t + math.pi / 2.0)
 
+        # Small yaw wave as a tiny fraction of roll/pitch amplitude
+        yaw_wave_amp_deg = max(0.2, amp * 0.03)   # at least 0.2° or ~3% of amp
+        yaw_phase = math.pi / 3.0
+        yaw_wave_deg = yaw_wave_amp_deg * math.sin(2.0 * math.pi * freq * t + yaw_phase)
+
+        # Optional rare spikes (use the instance RNG)
+        roll_spike = 0.0
+        pitch_spike = 0.0
+        yaw_spike = 0.0
+        if spike_prob > 0.0 and self._rng.random() < spike_prob:
+            sign = 1.0 if self._rng.random() < 0.5 else -1.0
+            roll_spike = sign * spike_amp
+            pitch_spike = sign * (0.6 * spike_amp)
+            yaw_spike = sign * (0.3 * spike_amp)
+
+        # Compose yaw: base heading + small wave + rare spike
+        yaw_deg = base_heading_deg + yaw_wave_deg + yaw_spike
+
+        # Convert to radians for the rotation matrix builder (method expects radians)
+        roll_rad = math.radians(roll_deg + roll_spike)
+        pitch_rad = math.radians(pitch_deg + pitch_spike)
+        yaw_rad = math.radians(yaw_deg)
+
+        # Rotation matrix world -> sensor
         R = self._euler_to_matrix(roll_rad, pitch_rad, yaw_rad)
 
-        # Angular rates (deg/s)
-        roll_rate = amp * 2 * math.pi * freq * math.cos(2 * math.pi * freq * t)
-        pitch_rate = (amp / 2.0) * 2 * math.pi * freq * math.cos(2 * math.pi * freq * t + math.pi / 2)
-        yaw_rate = (amp / 3.0) * 2 * math.pi * freq * math.cos(2 * math.pi * freq * t + math.pi / 3)
-        omega = np.array([roll_rate, pitch_rate, yaw_rate], dtype=float)
+        # Angular rates (deg/s) - analytical derivatives of the sinusoids
+        roll_rate_dps = amp * 2.0 * math.pi * freq * math.cos(2.0 * math.pi * freq * t)
+        pitch_rate_dps = (amp / 2.0) * 2.0 * math.pi * freq * math.cos(2.0 * math.pi * freq * t + math.pi / 2.0)
+        yaw_rate_dps = yaw_wave_amp_deg * 2.0 * math.pi * freq * math.cos(2.0 * math.pi * freq * t + yaw_phase)
 
+        # Spikes: we add no derivative for an instantaneous spike (rare), or we could add a short
+        # transient; for simplicity, ignore spike derivative (spike acts as a sudden bias).
+        omega = np.array([roll_rate_dps, pitch_rate_dps, yaw_rate_dps], dtype=float)
+
+        # Linear accelerations (heave/surge) not modelled here; return zeros
         a_lin = np.zeros(3, dtype=float)
+
         return a_lin, omega, R
