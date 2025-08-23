@@ -104,18 +104,21 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         lat = payload.get("lat")
         lon = payload.get("lon")
         alt = payload.get("alt")
+        spd = payload.get("speed")
         ts = _parse_ts(payload.get("ts"))
         STATE["latitude"] = lat
         STATE["longitude"] = lon
         STATE["altitude"] = alt
         STATE["gps_signal"] = payload.get("fix")
+        STATE["true_speed"] = spd
         STATE["latency"] = LAST_MESSAGE_TIME - ts
         if _prev_gps:
             dt = ts - _prev_gps["ts"]
             if dt > 0:
                 dist = _haversine(_prev_gps["lat"], _prev_gps["lon"], lat, lon)
-                STATE["true_speed"] = dist / dt
                 STATE["cog"] = _bearing(_prev_gps["lat"], _prev_gps["lon"], lat, lon)
+                if spd is None:
+                    STATE["true_speed"] = dist / dt
         _prev_gps = {"lat": lat, "lon": lon, "ts": ts}
 
     elif topic == "sensor/imu":

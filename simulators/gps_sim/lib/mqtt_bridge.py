@@ -15,6 +15,8 @@ from simulators.route import ScenarioRoute
 
 LOG = logging.getLogger("gps_sim.bridge")
 
+KNOTS_TO_MS = 0.514444
+
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
@@ -215,10 +217,12 @@ class GPSPublisher:
                     # Produce one sample at sim_t using scenario-defined motion
                     sample = self.gps.sample(sim_t, motion_provider=self.route.gps_motion)
                     meas = sample.get("meas", {})
+                    speed_knots = meas.get("speed_knots")
                     meas_out = {
                         "lat": meas.get("lat"),
                         "lon": meas.get("lon"),
                         "alt": meas.get("alt"),
+                        "speed": speed_knots * KNOTS_TO_MS if speed_knots is not None else None,
                         "fix": meas.get("fix_type"),
                         "ts": meas.get("ts"),
                     }
