@@ -1,16 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 const boatIconUrl = '/boat_top.png';
-const createBoatIcon = (angle = 0) =>
-  L.divIcon({
+
+const createBoatIcon = (angle = 0) => {
+  return L.divIcon({
     html: `<img src="${boatIconUrl}" style="transform: rotate(${angle}deg); width:40px; height:40px;"/>`,
     iconSize: [40, 40],
     iconAnchor: [20, 20],
     className: '',
   });
+};
 
 function MapReadyListener({ onReady }) {
   const map = useMap();
@@ -39,6 +41,17 @@ export default function MapPanel({ sensors }) {
 
   const PAN_MIN_MS = 125;
 
+  const headingDeg = useMemo(() => {
+    const heading = sensors?.heading;
+    if (heading == null) return null;
+    const h = Number(heading);
+    if (!Number.isFinite(h)) return null;
+    const deg = Math.abs(h) > 2 * Math.PI ? h : (h * 180) / Math.PI;
+    return ((deg % 360) + 360) % 360; // normalize to [0,360)
+  }, [sensors?.heading]);
+
+  const memoIcon = useMemo(() => createBoatIcon(headingDeg ?? 0), [headingDeg]);
+
   useEffect(() => {
     if (!sensors) return;
     const latRaw = sensors.latitude ?? sensors.lat ?? sensors.y ?? null;
@@ -60,16 +73,21 @@ export default function MapPanel({ sensors }) {
       }
     }
 
-    const heading = sensors.heading;
-    if (heading != null && markerRef.current) {
-      const deg = Math.abs(heading) > 2 * Math.PI ? Number(heading) : (heading * 180) / Math.PI;
-      const norm = ((deg % 360) + 360) % 360;
-      if (lastHeading.current == null || Math.abs(norm - lastHeading.current) > 0.01) {
-        markerRef.current.setIcon(createBoatIcon(norm));
-        lastHeading.current = norm;
+  }, [sensors]);
+
+  useEffect(() => {
+    if (markerRef.current) {
+      // Avoid tiny micro-updates if value didn't meaningfully change.
+      if (lastHeading.current == null || Math.abs((headingDeg ?? 0) - lastHeading.current) > 0.1) {
+        try {
+          markerRef.current.setIcon(createBoatIcon(headingDeg ?? 0));
+          lastHeading.current = headingDeg ?? 0;
+        } catch (err) {
+          console.error('[MapPanel] failed to update marker icon', err);
+        }
       }
     }
-  }, [sensors]);
+  }, [headingDeg]);
 
   const handleMapReady = useCallback((mapInstance) => {
     mapRef.current = mapInstance;
@@ -144,7 +162,9 @@ export default function MapPanel({ sensors }) {
         <MapReadyListener onReady={handleMapReady} />
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <Polyline positions={trail} pathOptions={{ color: 'yellow', dashArray: '4 4' }} />
-        {position && <Marker position={position} icon={createBoatIcon()} ref={markerRef} />}
+        {position && (
+          <Marker position={position} icon={memoIcon} ref={markerRef} />
+        )}
       </MapContainer>
 
       <div style={{ position: 'absolute', bottom: 10, left: 10, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 4 }}>
