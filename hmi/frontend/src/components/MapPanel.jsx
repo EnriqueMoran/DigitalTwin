@@ -6,7 +6,7 @@ import 'leaflet/dist/leaflet.css';
 const boatIconUrl = '/boat_top.png';
 const createBoatIcon = (angle = 0) =>
   L.divIcon({
-    html: `<img src="${boatIconUrl}" style="transform: rotate(${angle - 90}deg); width:40px; height:40px;"/>`,
+    html: `<img src="${boatIconUrl}" style="transform: rotate(${angle + 90}deg); width:40px; height:40px;"/>`,
     iconSize: [40, 40],
     iconAnchor: [20, 20],
     className: '',
