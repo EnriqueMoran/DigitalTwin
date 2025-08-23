@@ -69,7 +69,9 @@ export default function BoatViewer({ sensors }) {
       requestAnimationFrame(animate);
       if (liveRef.current && sensorsRef.current && modelRef.current) {
         const { roll = 0, pitch = 0, heading = 0 } = sensorsRef.current;
-        modelRef.current.rotation.set(roll || 0, pitch || 0, heading || 0);
+        modelRef.current.rotation.x = pitch || 0;
+        modelRef.current.rotation.y = heading || 0;
+        modelRef.current.rotation.z = roll || 0;
       }
       controls.update();
       renderer.render(scene, camera);
