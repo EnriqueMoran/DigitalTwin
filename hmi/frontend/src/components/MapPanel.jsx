@@ -60,10 +60,11 @@ export default function MapPanel({ sensors }) {
       }
     }
 
-    const heading = sensors.heading ?? sensors.cog;
-    if (heading !== undefined && markerRef.current) {
-      const deg = heading > 2 * Math.PI ? heading : (heading * 180) / Math.PI;
-      const rounded = Math.round(deg);
+    const heading = sensors.heading;
+    if (heading != null && markerRef.current) {
+      const deg = Math.abs(heading) > 2 * Math.PI ? heading : (heading * 180) / Math.PI;
+      const norm = ((deg % 360) + 360) % 360;
+      const rounded = Math.round(norm);
       if (lastHeading.current !== rounded) {
         markerRef.current.setIcon(createBoatIcon(rounded));
         lastHeading.current = rounded;

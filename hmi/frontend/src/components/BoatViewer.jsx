@@ -11,6 +11,7 @@ export default function BoatViewer({ sensors }) {
   const [live, setLive] = useState(true);
   const liveRef = useRef(false);
   const sensorsRef = useRef();
+  const modelRef = useRef();
   liveRef.current = live;
   sensorsRef.current = sensors;
 
@@ -38,7 +39,8 @@ export default function BoatViewer({ sensors }) {
     loader.load(
       boatUrl,
       (gltf) => {
-        scene.add(gltf.scene);
+        modelRef.current = gltf.scene;
+        scene.add(modelRef.current);
         const box = new THREE.Box3().setFromObject(gltf.scene);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
@@ -57,6 +59,7 @@ export default function BoatViewer({ sensors }) {
         const geometry = new THREE.BoxGeometry();
         const material = new THREE.MeshNormalMaterial();
         const cube = new THREE.Mesh(geometry, material);
+        modelRef.current = cube;
         scene.add(cube);
         animate();
       }
@@ -64,9 +67,9 @@ export default function BoatViewer({ sensors }) {
 
     function animate() {
       requestAnimationFrame(animate);
-      if (liveRef.current && sensorsRef.current) {
+      if (liveRef.current && sensorsRef.current && modelRef.current) {
         const { roll = 0, pitch = 0, heading = 0 } = sensorsRef.current;
-        scene.rotation.set(pitch || 0, heading || 0, roll || 0);
+        modelRef.current.rotation.set(roll || 0, pitch || 0, heading || 0);
       }
       controls.update();
       renderer.render(scene, camera);
