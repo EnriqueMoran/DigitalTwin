@@ -198,16 +198,26 @@ class IMUPublisher:
 
         dt_acc = 1.0 / float(self.imu.accel_odr_hz)
         dt_gyro = 1.0 / float(self.imu.gyro_odr_hz)
+        dt_mag = 1.0 / float(self.imu.mag_odr_hz)
         t_next_acc = time.time()
         t_next_gyro = time.time()
+        t_next_mag = time.time()
         last_acc = [0.0, 0.0, 0.0]
         last_gyro = [0.0, 0.0, 0.0]
+        last_mag = [0.0, 0.0, 0.0]
         sim_t_acc = 0.0
         sim_t_gyro = 0.0
+        sim_t_mag = 0.0
 
         self._running = True
-        LOG.info("Starting IMU publisher: accel ODR=%.1fHz gyro ODR=%.1fHz -> topic %s (qos=%d)",
-                 float(self.imu.accel_odr_hz), float(self.imu.gyro_odr_hz), self.topic, self.qos)
+        LOG.info(
+            "Starting IMU publisher: accel ODR=%.1fHz gyro ODR=%.1fHz mag ODR=%.1fHz -> topic %s (qos=%d)",
+            float(self.imu.accel_odr_hz),
+            float(self.imu.gyro_odr_hz),
+            float(self.imu.mag_odr_hz),
+            self.topic,
+            self.qos,
+        )
 
         try:
             while self._running:
@@ -227,6 +237,13 @@ class IMUPublisher:
                     t_next_gyro += dt_gyro
                     sim_t_gyro += dt_gyro
 
+                if now_t >= t_next_mag:
+                    a_lin, omega, R = self.route.imu_motion(sim_t_mag)
+                    _, m = self.imu.sample_mag(R)
+                    last_mag = [float(m[0]), float(m[1]), float(m[2])]
+                    t_next_mag += dt_mag
+                    sim_t_mag += dt_mag
+
                 payload = {
                     "ax": last_acc[0],
                     "ay": last_acc[1],
@@ -234,6 +251,9 @@ class IMUPublisher:
                     "gx": last_gyro[0],
                     "gy": last_gyro[1],
                     "gz": last_gyro[2],
+                    "mx": last_mag[0],
+                    "my": last_mag[1],
+                    "mz": last_mag[2],
                     "ts": now_iso(),
                     "seq": int(self._seq),
                 }
