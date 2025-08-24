@@ -23,7 +23,7 @@ export default function SensorData({ sensors = {} }) {
   const fmtLatLon = (v) => {
     if (v === undefined || v === null) return 'Null';
     const dec = Number(v).toFixed(5);
-    return `${dec} (${toDMS(v)})`;
+    return `${toDMS(v)} (${dec})`;
   };
 
   const fields = [
