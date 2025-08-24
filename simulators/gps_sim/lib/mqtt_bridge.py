@@ -205,7 +205,7 @@ class GPSPublisher:
 
         dt_pub = 1.0 / float(pub_hz)
         t_next = time.time()
-        sim_t = 0.0
+        sim_start = time.time()
 
         self._running = True
         LOG.info("Starting GPS publisher: publish_rate=%.2fHz -> topic %s (qos=%d)", pub_hz, self.topic, self.qos)
@@ -213,6 +213,7 @@ class GPSPublisher:
         try:
             while self._running:
                 now_t = time.time()
+                sim_t = now_t - sim_start
                 if now_t >= t_next:
                     # Produce one sample at sim_t using scenario-defined motion
                     sample = self.gps.sample(sim_t, motion_provider=self.route.gps_motion)
@@ -235,7 +236,6 @@ class GPSPublisher:
                             LOG.warning("Outgoing GPS payload failed schema validation: %s", ve.message)
                             # skip this publish (sleep until next tick to avoid busy-loop)
                             t_next += dt_pub
-                            sim_t += dt_pub
                             time.sleep(dt_pub)
                             continue
 
@@ -257,9 +257,8 @@ class GPSPublisher:
                     # If NMEA sentences present and protocol==nmea we could optionally publish them to another topic;
                     # for now we keep to the single JSON topic as per project style.
 
-                    # advance schedule and sim time
+                    # advance schedule
                     t_next += dt_pub
-                    sim_t += dt_pub
                 else:
                     # sleep until next scheduled publish to avoid busy-loop
                     sleep_dur = t_next - now_t

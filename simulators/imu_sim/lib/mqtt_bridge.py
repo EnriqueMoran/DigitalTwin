@@ -205,9 +205,7 @@ class IMUPublisher:
         last_acc = [0.0, 0.0, 0.0]
         last_gyro = [0.0, 0.0, 0.0]
         last_mag = [0.0, 0.0, 0.0]
-        sim_t_acc = 0.0
-        sim_t_gyro = 0.0
-        sim_t_mag = 0.0
+        sim_start = time.time()
 
         self._running = True
         LOG.info(
@@ -222,27 +220,25 @@ class IMUPublisher:
         try:
             while self._running:
                 now_t = time.time()
+                sim_t = now_t - sim_start
+
+                if now_t >= t_next_acc or now_t >= t_next_gyro or now_t >= t_next_mag:
+                    a_lin, omega, R = self.route.imu_motion(sim_t)
 
                 if now_t >= t_next_acc:
-                    a_lin, omega, R = self.route.imu_motion(sim_t_acc)
                     _, a_g = self.imu.sample_accel(a_lin, R)
                     last_acc = [float(a_g[0]), float(a_g[1]), float(a_g[2])]
                     t_next_acc += dt_acc
-                    sim_t_acc += dt_acc
 
                 if now_t >= t_next_gyro:
-                    a_lin, omega, R = self.route.imu_motion(sim_t_gyro)
                     _, w = self.imu.sample_gyro(omega, R)
                     last_gyro = [float(w[0]), float(w[1]), float(w[2])]
                     t_next_gyro += dt_gyro
-                    sim_t_gyro += dt_gyro
 
                 if now_t >= t_next_mag:
-                    a_lin, omega, R = self.route.imu_motion(sim_t_mag)
                     _, m = self.imu.sample_mag(R)
                     last_mag = [float(m[0]), float(m[1]), float(m[2])]
                     t_next_mag += dt_mag
-                    sim_t_mag += dt_mag
 
                 payload = {
                     "ax": last_acc[0],
