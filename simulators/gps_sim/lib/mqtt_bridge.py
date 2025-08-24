@@ -15,8 +15,6 @@ from simulators.route import ScenarioRoute
 
 LOG = logging.getLogger("gps_sim.bridge")
 
-KNOTS_TO_MS = 0.514444
-
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
@@ -223,7 +221,7 @@ class GPSPublisher:
                         "lat": meas.get("lat"),
                         "lon": meas.get("lon"),
                         "alt": meas.get("alt"),
-                        "speed": speed_knots * KNOTS_TO_MS if speed_knots is not None else None,
+                        "speed_knots": speed_knots,
                         "fix": meas.get("fix_type"),
                         "ts": meas.get("ts"),
                     }

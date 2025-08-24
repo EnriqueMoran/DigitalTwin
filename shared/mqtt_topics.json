@@ -30,6 +30,7 @@
           "lat":{"type":"number"},
           "lon":{"type":"number"},
           "alt":{"type":"number"},
+          "speed_knots":{"type":"number"},
           "fix":{"type":"integer"},
           "ts":{"type":"string","format":"date-time"}
         }
