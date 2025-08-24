@@ -56,7 +56,9 @@ class ESP32Parser:
     def parse_battery_out(self) -> str:
         return self.config["topics"].get("battery_out", fallback="sensor/battery")
 
-    #  Convenience / aggregators
+    def parse_status_topic(self) -> str:
+        return self.config["topics"].get("status_topic", fallback="sensor/status")
+
     def get_broker_cfg(self) -> Dict[str, object]:
         return {
             "host": self.parse_broker_host(),
