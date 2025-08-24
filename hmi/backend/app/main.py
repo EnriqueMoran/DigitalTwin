@@ -104,18 +104,13 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         lat = payload.get("lat")
         lon = payload.get("lon")
         alt = payload.get("alt")
-        speed_knots = payload.get("speed_knots")
-        spd_raw = payload.get("speed")
+        spd_knots = payload.get("speed")
         ts = _parse_ts(payload.get("ts"))
         STATE["latitude"] = lat
         STATE["longitude"] = lon
         STATE["altitude"] = alt
         STATE["gps_signal"] = payload.get("fix")
-        spd = None
-        if speed_knots is not None:
-            spd = speed_knots * 0.514444
-        elif spd_raw is not None:
-            spd = spd_raw
+        spd = spd_knots * 0.514444 if spd_knots is not None else None
         STATE["true_speed"] = spd
         STATE["latency"] = LAST_MESSAGE_TIME - ts
         if _prev_gps:

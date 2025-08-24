@@ -216,12 +216,12 @@ class GPSPublisher:
                     # Produce one sample at sim_t using scenario-defined motion
                     sample = self.gps.sample(sim_t, motion_provider=self.route.gps_motion)
                     meas = sample.get("meas", {})
-                    speed_knots = meas.get("speed_knots")
+                    speed_knots = meas.get("speed")
                     meas_out = {
                         "lat": meas.get("lat"),
                         "lon": meas.get("lon"),
                         "alt": meas.get("alt"),
-                        "speed_knots": speed_knots,
+                        "speed": speed_knots,
                         "fix": meas.get("fix_type"),
                         "ts": meas.get("ts"),
                     }

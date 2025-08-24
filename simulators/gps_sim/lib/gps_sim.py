@@ -491,8 +491,8 @@ class NEOM8N:
               "fix_type": int,
               "num_svs": int,
               "hdop": float,
-              "truth": {"lat":..., "lon":..., "alt":..., "speed_knots":..., "course_deg":..., "climb_m_s":...},
-              "meas": {"lat":..., "lon":..., "alt":..., "speed_knots":..., "course_deg":...},
+              "truth": {"lat":..., "lon":..., "alt":..., "speed":..., "course_deg":..., "climb_m_s":...},
+              "meas": {"lat":..., "lon":..., "alt":..., "speed":..., "course_deg":...},
               "nmea": ["$GPGGA,...*CS<term>", ...]   # present only if protocol == 'nmea'
             }
         """
@@ -547,7 +547,7 @@ class NEOM8N:
             "lat": lat_m,
             "lon": lon_m,
             "alt": alt_m,
-            "speed_knots": speed_knots_m,
+            "speed": speed_knots_m,
             "course_deg": float(truth_course_deg),
             "climb_m_s": float(truth_climb),
             "fix_type": fix,
@@ -589,7 +589,7 @@ class NEOM8N:
             # RMC (position, speed, course, date)
             date_str = utc.strftime("%d%m%y")
             # speed in knots, course in degrees
-            sog = f"{meas['speed_knots']:.1f}"
+            sog = f"{meas['speed']:.1f}"
             cog = f"{meas['course_deg']:.1f}"
             rmc_parts = [
                 "GPRMC",
@@ -616,9 +616,9 @@ class NEOM8N:
                 "T",
                 "",  # true course repeated placeholder
                 "M",
-                f"{meas['speed_knots']:.1f}",
+                f"{meas['speed']:.1f}",
                 "N",
-                f"{(meas['speed_knots'] * 1.852):.1f}",
+                f"{(meas['speed'] * 1.852):.1f}",
                 "K"
             ]
             vtg_body = ",".join(vtg_parts)
@@ -638,7 +638,7 @@ class NEOM8N:
                 "lat": truth_lat,
                 "lon": truth_lon,
                 "alt": truth_alt,
-                "speed_knots": truth_speed_knots,
+                "speed": truth_speed_knots,
                 "course_deg": truth_course_deg,
                 "climb_m_s": truth_climb,
             },
@@ -652,7 +652,7 @@ class NEOM8N:
         Run a simulation for duration_s seconds. Returns a dictionary with:
          {
            "t": np.array([...]),
-           "truth": {"lat": np.array([...]), "lon":..., "alt":..., "speed_knots":..., "course_deg":...},
+           "truth": {"lat": np.array([...]), "lon":..., "alt":..., "speed":..., "course_deg":...},
            "meas": list of measurement dicts,
            "nmea": list of lists per sample (each list contains nmea sentences)
          }
@@ -665,7 +665,7 @@ class NEOM8N:
         t0 = 0.0
         t_end = float(duration_s)
         samples_t: List[float] = []
-        truths = {"lat": [], "lon": [], "alt": [], "speed_knots": [], "course_deg": []}
+        truths = {"lat": [], "lon": [], "alt": [], "speed": [], "course_deg": []}
         meas_list: List[Dict[str, Any]] = []
         nmea_all: List[List[str]] = []
 
@@ -676,7 +676,7 @@ class NEOM8N:
             truths["lat"].append(sample["truth"]["lat"])
             truths["lon"].append(sample["truth"]["lon"])
             truths["alt"].append(sample["truth"]["alt"])
-            truths["speed_knots"].append(sample["truth"]["speed_knots"])
+            truths["speed"].append(sample["truth"]["speed"])
             truths["course_deg"].append(sample["truth"]["course_deg"])
             meas_list.append(sample["meas"])
             nmea_all.append(sample.get("nmea", []))

@@ -101,7 +101,7 @@ def test_read_config_and_init_and_sample_no_noise(tmp_path):
     assert abs(meas["lat"] - truth["lat"]) < 1e-12
     assert abs(meas["lon"] - truth["lon"]) < 1e-12
     assert abs(meas["alt"] - truth["alt"]) < 1e-12
-    assert abs(meas["speed_knots"] - truth["speed_knots"]) < 1e-12
+    assert abs(meas["speed"] - truth["speed"]) < 1e-12
     # nmea present since protocol=nmea
     assert isinstance(s["nmea"], list)
     assert any("$GPGGA" in ns for ns in s["nmea"])
