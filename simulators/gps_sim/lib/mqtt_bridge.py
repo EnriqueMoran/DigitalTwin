@@ -2,11 +2,12 @@ import json
 import logging
 import time
 
+import paho.mqtt.client as mqtt
+
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any
 
-import paho.mqtt.client as mqtt
 from jsonschema import Draft7Validator
 from jsonschema.exceptions import ValidationError
 
@@ -25,13 +26,12 @@ class GPSPublisher:
         self.config_path = Path(config_path)
         self.gps = NEOM8N(str(self.config_path))
 
-        # MQTT / publishing configuration (defaults)
         self.broker_host: str = "localhost"
         self.broker_port: int = 1883
-        self.client_id: str = "gps_sim"
+        self.client_id: str   = "gps_sim"
         self.retain_status: bool = True
         self.topic: str = "sim/gps"
-        self.qos: int = 0
+        self.qos: int   = 0
         self.status_topic: str = "sensor/status"
         self.validate_schema: bool = False
         self.schema_path: Optional[Path] = None
@@ -53,6 +53,7 @@ class GPSPublisher:
         except Exception as e:
             LOG.error("Failed to load scenario %s: %s", scen_path, e)
             raise
+
 
     def _load_mqtt_config(self) -> None:
         import configparser
@@ -121,7 +122,7 @@ class GPSPublisher:
             return
 
         topics = top_spec.get("topics", {})
-        tinfo = topics.get(self.topic)
+        tinfo  = topics.get(self.topic)
         if not tinfo:
             LOG.error("Schema file does not contain topic %s. Disabling validation.", self.topic)
             self.validate_schema = False
@@ -137,6 +138,7 @@ class GPSPublisher:
         self._validator = Draft7Validator(schema)
         LOG.info("Loaded schema for topic %s from %s", self.topic, self.schema_path)
 
+
     def read_and_init_gps(self, seed: Optional[int] = 1) -> None:
         """
         Read GPS configuration and initialize simulator RNG/scheduling.
@@ -144,6 +146,7 @@ class GPSPublisher:
         LOG.info("Reading GPS config from %s", self.config_path)
         self.gps.read_config()
         self.gps.init_sim(seed=seed)
+
 
     def _setup_mqtt_client(self) -> None:
         self.client = mqtt.Client(client_id=self.client_id)
@@ -156,6 +159,7 @@ class GPSPublisher:
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
 
+
     def _on_connect(self, client, userdata, flags, rc):
         if rc == 0:
             LOG.info("Connected to broker %s:%s", self.broker_host, self.broker_port)
@@ -167,8 +171,10 @@ class GPSPublisher:
         else:
             LOG.error("MQTT connect failed with rc=%s", rc)
 
+
     def _on_disconnect(self, client, userdata, rc):
         LOG.warning("Disconnected from broker (rc=%s)", rc)
+
 
     def start(self) -> None:
         """
@@ -237,7 +243,6 @@ class GPSPublisher:
                             time.sleep(dt_pub)
                             continue
 
-                    # Optional logging of outgoing message
                     if self.log_messages:
                         try:
                             log_msg = {"topic": self.topic, "ts_local": now_iso(), "payload": meas_out}
@@ -245,17 +250,11 @@ class GPSPublisher:
                         except Exception:
                             LOG.debug("Failed to log outgoing message")
 
-                    # Publish
                     try:
                         self.client.publish(self.topic, json.dumps(meas_out, separators=(",", ":")), qos=self.qos, retain=False)
                         LOG.debug("Published to %s", self.topic)
                     except Exception as e:
                         LOG.warning("Failed to publish GPS payload: %s", e)
-
-                    # If NMEA sentences present and protocol==nmea we could optionally publish them to another topic;
-                    # for now we keep to the single JSON topic as per project style.
-
-                    # advance schedule
                     t_next += dt_pub
                 else:
                     # sleep until next scheduled publish to avoid busy-loop
@@ -266,6 +265,7 @@ class GPSPublisher:
             LOG.info("Keyboard interrupt received; stopping")
         finally:
             self.stop()
+
 
     def stop(self) -> None:
         LOG.info("Stopping GPS MQTT publisher")

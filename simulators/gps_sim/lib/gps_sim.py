@@ -1,9 +1,11 @@
-from typing import Callable, Dict, Any, List, Optional, Tuple
-from pathlib import Path
 import math
 import time
+
 import numpy as np
+
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Callable, Dict, Any, List, Optional, Tuple
 
 from simulators.gps_sim.lib.configparser import GPSConfigParser
 
@@ -34,8 +36,8 @@ def _format_lat(lat: float) -> Tuple[str, str]:
     Convert decimal degrees latitude into NMEA ddmm.mmmm and hemisphere.
     """
     hemi = "N" if lat >= 0 else "S"
-    lat = abs(lat)
-    deg = int(lat)
+    lat  = abs(lat)
+    deg  = int(lat)
     minutes = (lat - deg) * 60.0
     ddmm = f"{deg:02d}{minutes:07.4f}"
     return ddmm, hemi
@@ -46,8 +48,8 @@ def _format_lon(lon: float) -> Tuple[str, str]:
     Convert decimal degrees longitude into NMEA dddmm.mmmm and hemisphere.
     """
     hemi = "E" if lon >= 0 else "W"
-    lon = abs(lon)
-    deg = int(lon)
+    lon  = abs(lon)
+    deg  = int(lon)
     minutes = (lon - deg) * 60.0
     dddmm = f"{deg:03d}{minutes:07.4f}"
     return dddmm, hemi
@@ -57,7 +59,6 @@ class NEOM8N:
     def __init__(self, config_file: str = "config.ini"):
         self.config_file = Path(config_file)
 
-        # raw backing fields
         self._baudrate: Optional[int] = None
         self._protocol: Optional[str] = None
         self._use_ublox_binary: Optional[bool] = None
@@ -66,18 +67,18 @@ class NEOM8N:
         self._nav_rate_ms: Optional[int] = None
 
         self._fix_type: Optional[int] = None
-        self._num_svs: Optional[int] = None
+        self._num_svs: Optional[int]  = None
 
         self._initial_lat: Optional[float] = None
         self._initial_lon: Optional[float] = None
         self._initial_alt: Optional[float] = None
 
         self._speed_knots_cfg: Optional[float] = None
-        self._course_deg_cfg: Optional[float] = None
-        self._climb_m_s_cfg: Optional[float] = None
+        self._course_deg_cfg: Optional[float]  = None
+        self._climb_m_s_cfg: Optional[float]   = None
 
-        self._pos_noise_m: Optional[float] = None
-        self._alt_noise_m: Optional[float] = None
+        self._pos_noise_m: Optional[float]   = None
+        self._alt_noise_m: Optional[float]   = None
         self._vel_noise_m_s: Optional[float] = None
         self._hdop: Optional[float] = None
 
@@ -85,26 +86,22 @@ class NEOM8N:
         self._nmea_term: Optional[str] = None
 
         self._publish_rate_hz: Optional[float] = None
-        self._retain_messages: Optional[bool] = None
+        self._retain_messages: Optional[bool]  = None
 
         self._rng: Optional[np.random.Generator] = None
         self._t: float = 0.0
         self._dt: Optional[float] = None
         self._t_next: Optional[float] = None
 
-        # For monotonic-time checks on sample()
         self._last_sample_t: Optional[float] = None
 
         self._truth_lat = None
         self._truth_lon = None
         self._truth_alt = None
         self._truth_speed_knots = None
-        self._truth_course_deg = None
-        self._truth_climb_m_s = None
+        self._truth_course_deg  = None
+        self._truth_climb_m_s   = None
 
-    # ---------------------
-    # Properties (validated)
-    # ---------------------
     @property
     def baudrate(self) -> Optional[int]:
         return self._baudrate
@@ -342,67 +339,53 @@ class NEOM8N:
             raise TypeError("retain_messages must be boolean")
         self._retain_messages = val
 
-    # ---------------------
-    # Config loading
-    # ---------------------
+
     def read_config(self) -> None:
         parser = GPSConfigParser(str(self.config_file))
 
-        # transport / formatting
         self.baudrate = parser.parse_baudrate()
         self.protocol = parser.parse_protocol()
         self.use_ublox_binary = parser.parse_use_ublox_binary()
 
-        # timing / rates
-        # parser returns float or raw -> setter will validate
         self.update_rate_hz = parser.parse_update_rate_hz()
         self.nav_rate_ms = parser.parse_nav_rate_ms()
 
-        # fix / sats
         self.fix_type = parser.parse_fix_type()
         self.num_svs = parser.parse_num_svs()
 
-        # initial position (parser returns floats when possible)
         lat, lon, alt = parser.parse_initial_position()
-        # Use individual setters to enforce ranges
         self.initial_lat = lat
         self.initial_lon = lon
         self.initial_alt = alt
 
-        # kinematics if present (parser may omit -> use defaults)
         try:
-            self._speed_knots_cfg = parser.parse_publish_rate_hz()  # (not used here); keep compat
+            self._speed_knots_cfg = parser.parse_publish_rate_hz()
         except Exception:
             pass
-        # noise & publishing
-        self.pos_noise_m = parser.parse_pos_noise_m()
-        self.alt_noise_m = parser.parse_alt_noise_m()
+
+        self.pos_noise_m   = parser.parse_pos_noise_m()
+        self.alt_noise_m   = parser.parse_alt_noise_m()
         self.vel_noise_m_s = parser.parse_vel_noise_m_s()
         self.hdop = parser.parse_hdop()
 
-        # nmea formatting / publishing
         nmea_sent = parser.parse_nmea_sentences()
         self.nmea_sentences = nmea_sent if nmea_sent is not None else None
         self.nmea_term = parser.parse_nmea_term()
         self.publish_rate_hz = parser.parse_publish_rate_hz()
         self.retain_messages = parser.parse_retain_messages()
 
-        # compute dt if update_rate_hz was set by setter
         if self._update_rate_hz is None:
             self._update_rate_hz = 1.0
             self._dt = 1.0
 
-        # initialize internal truth from config
         self._truth_lat = float(self._initial_lat)
         self._truth_lon = float(self._initial_lon)
         self._truth_alt = float(self._initial_alt)
         self._truth_speed_knots = float(self._speed_knots_cfg or 0.0)
-        self._truth_course_deg = float(self._course_deg_cfg or 0.0)
-        self._truth_climb_m_s = float(self._climb_m_s_cfg or 0.0)
+        self._truth_course_deg  = float(self._course_deg_cfg or 0.0)
+        self._truth_climb_m_s   = float(self._climb_m_s_cfg or 0.0)
 
-    # ---------------------
-    # RNG / simulation init
-    # ---------------------
+
     def init_sim(self, seed: Optional[int] = None) -> None:
         """
         Prepare RNG and scheduling. Must call read_config() first.
@@ -437,19 +420,21 @@ class NEOM8N:
         new_lon = lon_deg + math.degrees(dlon)
         return new_lat, new_lon
 
+
     def _apply_motion_internal(self, dt: float) -> None:
         """
         Integrate the simple constant-velocity motion model for dt seconds updating
         internal truth: lat, lon, alt, using speed and course.
         """
         speed_m_s = self._knots_to_m_s(self._truth_speed_knots)
-        distance = speed_m_s * dt
+        distance  = speed_m_s * dt
         # course_deg: 0 = North, 90 = East
         heading_rad = math.radians(self._truth_course_deg)
         north = distance * math.cos(heading_rad)
-        east = distance * math.sin(heading_rad)
+        east  = distance * math.sin(heading_rad)
         self._truth_lat, self._truth_lon = self._move_lat_lon(self._truth_lat, self._truth_lon, north, east)
         self._truth_alt += self._truth_climb_m_s * dt
+
 
     def _add_noise(self, lat: float, lon: float, alt: float, speed_knots: float) -> Tuple[float, float, float, float]:
         """
@@ -464,7 +449,7 @@ class NEOM8N:
         # Positional noise: sample in local east/north and convert to lat/lon offset
         sigma = float(self._pos_noise_m or 0.0)
         if sigma > 0.0:
-            east = rng.normal(loc=0.0, scale=sigma)
+            east  = rng.normal(loc=0.0, scale=sigma)
             north = rng.normal(loc=0.0, scale=sigma)
             lat_n, lon_n = self._move_lat_lon(lat, lon, north, east)
         else:
@@ -475,9 +460,10 @@ class NEOM8N:
 
         vel_sigma = float(self._vel_noise_m_s or 0.0)
         speed_m_s = self._knots_to_m_s(float(speed_knots))
-        speed_m_s_n = speed_m_s + (rng.normal(loc=0.0, scale=vel_sigma) if vel_sigma > 0.0 else 0.0)
+        speed_m_s_n   = speed_m_s + (rng.normal(loc=0.0, scale=vel_sigma) if vel_sigma > 0.0 else 0.0)
         speed_knots_n = self._m_s_to_knots(speed_m_s_n)
         return lat_n, lon_n, alt_n, speed_knots_n
+
 
     def sample(self, t: float, motion_provider: Optional[MotionProvider] = None) -> Dict[str, Any]:
         """
@@ -510,7 +496,7 @@ class NEOM8N:
             truth_lon = float(lon_t)
             truth_alt = float(alt_t)
             truth_speed_knots = float(sp_knots_t)
-            truth_course_deg = float(course_t)
+            truth_course_deg  = float(course_t)
             truth_climb = float(climb_t)
             # update last sample time even if not using internal integration
             self._last_sample_t = float(t)
@@ -528,7 +514,7 @@ class NEOM8N:
             truth_lon = float(self._truth_lon)
             truth_alt = float(self._truth_alt)
             truth_speed_knots = float(self._truth_speed_knots)
-            truth_course_deg = float(self._truth_course_deg)
+            truth_course_deg  = float(self._truth_course_deg)
             truth_climb = float(self._truth_climb_m_s)
             self._last_sample_t = float(t)
 
@@ -537,8 +523,8 @@ class NEOM8N:
 
         # HDOP, fix and sats come from config
         hdop = float(self._hdop or 1.0)
-        fix = int(self._fix_type or 3)
-        svs = int(self._num_svs or 8)
+        fix  = int(self._fix_type or 3)
+        svs  = int(self._num_svs or 8)
 
         ts_epoch = time.time()
         ts_iso = now_iso()
@@ -626,7 +612,6 @@ class NEOM8N:
             vtg_sentence = f"${vtg_body}*{vtg_cs}{self._nmea_term}"
             nmea_list.append(vtg_sentence)
 
-            # keep only configured sentences in order if user limited them
             configured = [s.upper() for s in (self._nmea_sentences or [])]
             # sentence id for "$GPxxx" is characters 3..5 inclusive (slice 3:6)
             nmea_list = [s for s in nmea_list if len(s) >= 6 and s[3:6] in configured] if configured else nmea_list
@@ -646,6 +631,7 @@ class NEOM8N:
             "nmea": nmea_list,
         }
         return result
+
 
     def simulate(self, duration_s: float, motion_provider: Optional[MotionProvider] = None) -> Dict[str, Any]:
         """

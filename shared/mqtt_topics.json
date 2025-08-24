@@ -67,17 +67,6 @@
       "direction": "publisher=esp32_sim, subscriber=station",
       "qos_recommended": 1,
       "schema": { "$ref": "#/topics/sim/battery/schema" }
-    },
-    "sensor/status": {
-      "description": "Online/offline LWT status (retained)",
-      "direction": "publisher=esp32_sim, subscriber=station",
-      "qos_recommended": 1,
-      "retained": true,
-      "schema": {
-        "type":"object",
-        "required":["status","ts"],
-        "properties":{"status":{"type":"string"},"ts":{"type":"string","format":"date-time"}}
-      }
     }
   }
 }

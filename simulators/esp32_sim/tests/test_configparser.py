@@ -15,7 +15,7 @@ client_id = esp32_sim
 retain_status = true
 publish_qos_imu = 0
 publish_qos_gps = 1
-publish_qos_batt = 1
+publish_qos_battery = 1
 validate_schema = true
 schema_path = ../../shared/mqtt_topics.json
 
@@ -106,25 +106,6 @@ def test_read_config_populates_properties(tmp_path):
 
     # mqtt client created
     assert esp.client is not None
-
-
-def test_alternate_battery_keys_and_publish_qos(tmp_path):
-    cfg_path = write_cfg(tmp_path, ALTERNATE_BATT_CONFIG)
-    esp = ESP32(cfg_path)
-    esp.read_config()
-
-    assert esp.broker_host == "example-broker"
-    assert esp.broker_port == 1884
-
-    assert esp.client_id == "esp32_sim_alt"
-    assert esp.retain_status is False
-
-    # when publish_qos_batt is absent but publish_qos_battery present, it should be used
-    assert esp.qos_batt == 2
-
-    # batt_in / batt_out fallback
-    assert esp.batt_in == "sim/battery_alt"
-    assert esp.batt_out == "sensor/battery_alt"
 
 
 def test_minimal_config_uses_defaults(tmp_path):

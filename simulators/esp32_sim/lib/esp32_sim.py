@@ -1,6 +1,7 @@
 import json
 import logging
 import time
+
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -29,27 +30,27 @@ class ESP32:
         self._client_id: Optional[str] = None
         self._retain_status: bool = True
 
-        self._imu_in: Optional[str] = None
-        self._gps_in: Optional[str] = None
+        self._imu_in: Optional[str]  = None
+        self._gps_in: Optional[str]  = None
         self._batt_in: Optional[str] = None
 
-        self._imu_out: Optional[str] = None
-        self._gps_out: Optional[str] = None
+        self._imu_out: Optional[str]  = None
+        self._gps_out: Optional[str]  = None
         self._batt_out: Optional[str] = None
 
         self._status_topic: Optional[str] = None
 
-        self._qos_imu: int = 0
-        self._qos_gps: int = 1
+        self._qos_imu: int  = 0
+        self._qos_gps: int  = 1
         self._qos_batt: int = 1
 
-        self._validate_schema: bool = False
+        self._validate_schema: bool = True
         self._schema_path: Optional[str] = None
         self._schemas_exact: Dict[str, Dict[str, Any]] = {}
 
         self.client: Optional[mqtt.Client] = None
 
-        self.running = False
+        self.running  = False
         self._pub_seq = 0
         self._last_recv = {"imu": None, "gps": None, "battery": None}
 
@@ -216,19 +217,19 @@ class ESP32:
         self.retain_status = parser.parse_retain_status()
 
         topics = parser.get_topics_map()
-        self.imu_in = topics.get("imu_in")
-        self.gps_in = topics.get("gps_in")
+        self.imu_in  = topics.get("imu_in")
+        self.gps_in  = topics.get("gps_in")
         self.batt_in = topics.get("battery_in")
 
-        self.imu_out = topics.get("imu_out")
-        self.gps_out = topics.get("gps_out")
+        self.imu_out  = topics.get("imu_out")
+        self.gps_out  = topics.get("gps_out")
         self.batt_out = topics.get("battery_out")
 
         self.status_topic = topics.get("status_topic")
 
         qos_map = parser.get_qos_map()
-        self.qos_imu = qos_map.get("imu", 0)
-        self.qos_gps = qos_map.get("gps", 1)
+        self.qos_imu  = qos_map.get("imu", 0)
+        self.qos_gps  = qos_map.get("gps", 1)
         self.qos_batt = qos_map.get("battery", 1)
 
         self.validate_schema = parser.parse_validate_schema()
@@ -335,7 +336,7 @@ class ESP32:
                     LOG.warning("Schema validation failed for topic %s: %s", topic, ve.message)
                     return
 
-        now_epoch = time.time()
+        now_epoch  = time.time()
         now_iso_ts = now_iso()
         if topic == self.imu_in:
             self._last_recv["imu"] = now_epoch

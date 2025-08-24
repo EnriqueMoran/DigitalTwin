@@ -29,9 +29,6 @@ class ESP32Parser:
         return self.config["esp32"].getint("publish_qos_gps", fallback=1)
 
     def parse_publish_qos_batt(self) -> int:
-        # key name in config is publish_qos_batt or publish_qos_battery fallback
-        if self.config["esp32"].get("publish_qos_batt", None) is not None:
-            return self.config["esp32"].getint("publish_qos_batt", fallback=1)
         return self.config["esp32"].getint("publish_qos_battery", fallback=1)
 
     def parse_validate_schema(self) -> bool:
@@ -48,10 +45,7 @@ class ESP32Parser:
         return self.config["topics"].get("gps_in", fallback="sim/gps")
 
     def parse_battery_in(self) -> str:
-        # support both 'battery_in' and 'batt_in' keys if present
-        if "battery_in" in self.config["topics"]:
-            return self.config["topics"].get("battery_in", fallback="sim/battery")
-        return self.config["topics"].get("batt_in", fallback="sim/battery")
+        return self.config["topics"].get("battery_in", fallback="sim/battery")
 
     def parse_imu_out(self) -> str:
         return self.config["topics"].get("imu_out", fallback="sensor/imu")
@@ -60,12 +54,7 @@ class ESP32Parser:
         return self.config["topics"].get("gps_out", fallback="sensor/gps")
 
     def parse_battery_out(self) -> str:
-        if "battery_out" in self.config["topics"]:
-            return self.config["topics"].get("battery_out", fallback="sensor/battery")
-        return self.config["topics"].get("batt_out", fallback="sensor/battery")
-
-    def parse_status_topic(self) -> str:
-        return self.config["topics"].get("status_topic", fallback="sensor/status")
+        return self.config["topics"].get("battery_out", fallback="sensor/battery")
 
     #  Convenience / aggregators
     def get_broker_cfg(self) -> Dict[str, object]:
