@@ -13,7 +13,7 @@ The initial digital twin models the following parameters and systems:
 - Battery autonomy
 - Seabed depth map
 
-The project is split between onboard firmware, a containerized ground station, and several sensor simulators.
+The project is split between onboard firmware, a containerized HMI, and several sensor simulators.
 
 ```text
 DigitalTwin/
@@ -28,48 +28,25 @@ DigitalTwin/
 │  ├─ battery_sim/                # battery voltage/current curve
 │  └─ esp32_sim/                  # collects sensors and forwards telemetry
 │
-├─ ground/                        # ground station (processing and visualization)
-│  ├─ app/                        # FastAPI services and business logic
-│  │  ├─ config.py                # global parameters (IP, ports, battery curves…)
-│  │  ├─ main.py                  # entry point: starts ingestion, estimation, and API
-│  │  ├─ wiring.py                # “connection board”: shared instances (queue, services, state)
-│  │  ├─ schemas.py               # Pydantic data models (raw Telemetry, processed State)
-│  │  ├─ services/                # business logic (each ship system, but processed on ground)
-│  │  │  ├─ ingest_udp.py         # receives telemetry from ESP32 over WiFi/UDP
-│  │  │  ├─ state_estimator.py    # IMU/GPS fusion → roll, pitch, yaw, speed, heading
-│  │  │  ├─ battery.py            # estimates SoC and autonomy from V/A
-│  │  │  ├─ depth_mapper.py       # builds depth cloud/map with GPS+z points
-│  │  │  └─ recorder.py           # saves telemetry/state into SQLite
-│  │  ├─ api/
-│  │  │  ├─ http.py               # FastAPI REST endpoints (e.g. /state)
-│  │  │  └─ ws.py                 # WebSocket for live state streaming
-│  │  └─ utils/
-│  │     ├─ geo.py                # GPS → ENU (flat coordinate) conversions
-│  │     └─ filters.py            # fusion algorithms (Madgwick/EKF, averages, EKF)
-│  ├─ web/
-│  │  ├─ index.html               # web interface (Three.js + data panels)
-│  │  └─ app.js                   # JavaScript consuming API/WS and updating UI
-│  ├─ scripts/
-│  │  └─ replay.py                # replays a saved log → API (debug/replay)
-│  ├─ tests/                      # unit tests for services and utilities
-│  ├─ requirements.txt            # Python dependencies
-│  └─ Dockerfile                  # container definition
+├─ hmi/                           # human–machine interface (backend + frontend)
+│  ├─ backend/                    # FastAPI backend services and API
+│  └─ frontend/                   # React UI
 │
-├─ docker-compose.yml             # orchestrates ground + simulators
-└─ shared/                        # common definitions between boat and ground
+├─ docker-compose.yml             # orchestrates HMI + simulators
+└─ shared/                        # common definitions between boat and HMI
    ├─ protocols/                  # JSON message formats, protocol constants
    └─ docs/                       # specification documentation, flow diagrams
 ```
 
 ## Running with Docker
 
-Build and start the full environment (ground station plus simulators):
+Build and start the full environment (HMI plus simulators):
 
 ```bash
 docker-compose up --build
 ```
 
-This launches the ground station on port `8000` and separate containers for each simulator. Telemetry flows from the simulators to the ESP32 multiplexer simulator and finally to the ground station for processing and visualization.
+This launches the HMI backend on port `8001` and the frontend on `3000` alongside containers for each simulator. Telemetry flows from the simulators to the ESP32 multiplexer simulator and finally to the HMI for processing and visualization.
 
 Build and start one single component:
 ```bash

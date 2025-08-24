@@ -22,8 +22,6 @@ services:
     volumes:
       - ./shared:/app/simulators/shared:ro
     environment:
-      - GROUND_HOST=ground
-      - GROUND_PORT=9001
       - RUN_TESTS=0
       - ESP32_SIM_CONFIG=/app/simulators/esp32_sim/config.ini
     depends_on:
@@ -80,17 +78,6 @@ services:
       - mosquitto
     logging:
       driver: "${BATTERY_SIM_LOG_DRIVER:-json-file}"
-
-  ground:
-    build: ./ground
-    container_name: digitaltwin_ground
-    ports:
-      - "8000:8000"
-    restart: unless-stopped
-    depends_on:
-      - esp32_sim
-    logging:
-      driver: "${GROUND_LOG_DRIVER:-json-file}"
 
   hmi_backend:
     build: ./hmi/backend
