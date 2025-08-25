@@ -42,6 +42,8 @@ class IMUPublisher:
         self._running = False
         self._seq = 0
 
+        self.log_messages: bool = False
+
         self._load_mqtt_config()
 
         # Load navigation scenario defining motion and sea state
@@ -87,9 +89,13 @@ class IMUPublisher:
             self.schema_path = None
 
         self.status_topic = mqtt_section.get("status_topic", "sensor/status")
+        try:
+            self.log_messages = mqtt_section.getboolean("log_messages", fallback=False)
+        except Exception:
+            self.log_messages = False
 
         LOG.debug(
-            "MQTT config loaded: host=%s port=%s client_id=%s topic=%s qos=%s validate_schema=%s schema_path=%s",
+            "MQTT config loaded: host=%s port=%s client_id=%s topic=%s qos=%s validate_schema=%s schema_path=%s log_messages=%s",
             self.broker_host,
             self.broker_port,
             self.client_id,
@@ -97,6 +103,7 @@ class IMUPublisher:
             self.qos,
             self.validate_schema,
             str(self.schema_path) if self.schema_path else None,
+            self.log_messages,
         )
 
 
@@ -262,6 +269,13 @@ class IMUPublisher:
                         LOG.warning("Outgoing payload failed schema validation: %s", ve.message)
                         time.sleep(0.0005)
                         continue
+
+                if self.log_messages:
+                    try:
+                        log_msg = {"topic": self.topic, "ts_local": now_iso(), "payload": payload}
+                        LOG.info(json.dumps(log_msg, separators=(",", ":"), ensure_ascii=False))
+                    except Exception:
+                        LOG.debug("Failed to log outgoing message")
 
                 try:
                     self.client.publish(self.topic, json.dumps(payload, separators=(",", ":")), qos=self.qos, retain=False)
