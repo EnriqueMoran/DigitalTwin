@@ -91,7 +91,12 @@ export default function RadarViewer({ sensors }) {
   return (
     <div style={{ display: 'flex', height: '100%', width: '100%' }}>
       <div
-        style={{ flex: 1, background: '#0b2d3c' }}
+        style={{
+          height: '100%',
+          aspectRatio: '1 / 1',
+          background: '#0b2d3c',
+          flex: '0 0 auto',
+        }}
         onClick={handleBackgroundClick}
       >
         <svg viewBox={`0 0 ${VIEW_SIZE} ${VIEW_SIZE}`} width="100%" height="100%">
@@ -153,7 +158,16 @@ export default function RadarViewer({ sensors }) {
           {visibleTracks.map(renderTrack)}
         </svg>
       </div>
-      <div style={{ width: 220, padding: 8, color: '#fff', background: '#444' }}>
+      <div
+        style={{
+          flex: 1,
+          minWidth: 220,
+          padding: 8,
+          color: '#fff',
+          background: '#444',
+          overflow: 'auto',
+        }}
+      >
         <div style={{ marginBottom: 12 }}>
           <label>
             View range (m): {range}
