@@ -1,4 +1,5 @@
 {
+  "enabled": true,
   "mode": "record",
   "host": "mosquitto",
   "port": 1883,

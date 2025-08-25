@@ -13,7 +13,7 @@ This repository contains a digital twin of a radio‑controlled warship. The phy
 - MQTT broker (Mosquitto)
 - FastAPI backend with React frontend
 - Dockerised sensor simulators
-- MQTT recorder with replay capability and optional message logging
+- MQTT recorder with replay capability, optional message logging, and configurable enable flag
 
 ## Repository structure
 

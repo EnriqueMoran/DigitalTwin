@@ -98,6 +98,7 @@ def replay_mode(client: mqtt.Client, load_file: str, topics: List[str], log_mess
 
 if __name__ == '__main__':
     config = load_config(CONFIG_PATH)
+    enabled = bool(config.get('enabled', True))
     host = config.get('host', 'mosquitto')
     port = int(config.get('port', 1883))
     mode = config.get('mode', 'record')
@@ -107,6 +108,10 @@ if __name__ == '__main__':
     log_messages = bool(config.get('log_messages', False))
 
     logging.basicConfig(level=logging.INFO if log_messages else logging.WARNING)
+
+    if not enabled:
+        LOG.warning("Recorder disabled by configuration; exiting")
+        exit(0)
 
     client = mqtt.Client()
     client.connect(host, port)
