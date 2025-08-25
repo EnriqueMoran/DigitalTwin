@@ -32,7 +32,15 @@ function App() {
       <Routes>
         <Route
           path="/"
-          element={<MainScreen sensors={{ ...data.sensors, connection_state: active ? 'Active' : 'Inactive' }} />}
+          element={
+            <MainScreen
+              sensors={{
+                ...data.sensors,
+                connection_state: active ? 'Active' : 'Inactive',
+                last_message_time: data.last_message_time,
+              }}
+            />
+          }
         />
       </Routes>
     </>
