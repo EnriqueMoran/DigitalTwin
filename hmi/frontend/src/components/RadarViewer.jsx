@@ -169,7 +169,7 @@ export default function RadarViewer({ sensors }) {
         }}
       >
         <div style={{ marginBottom: 12 }}>
-          <label>
+          <label style={{ display: 'flex', flexDirection: 'column' }}>
             View range (m): {range}
             <input
               type="range"
@@ -182,7 +182,7 @@ export default function RadarViewer({ sensors }) {
           </label>
         </div>
         <div style={{ marginBottom: 12 }}>
-          <label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <input
               type="checkbox"
               checked={showInfo}
@@ -193,50 +193,59 @@ export default function RadarViewer({ sensors }) {
         </div>
         <div>
           <h4>Selected Track Info</h4>
-          <form>
-            <div>
+          <form style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ display: 'flex', flexDirection: 'column' }}>
               Distance (m):
               <input
                 type="text"
                 value={
                   selectedTrack
                     ? Number(selectedTrack.distance).toFixed(2)
-                    : ""
+                    : ''
                 }
                 readOnly
+                style={{
+                  background: 'transparent',
+                  color: 'inherit',
+                  border: 'none',
+                }}
               />
-            </div>
-            <div>
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column' }}>
               Bearing (deg):
               <input
                 type="text"
                 value={
                   selectedTrack
                     ? Number(selectedTrack.bearing).toFixed(2)
-                    : ""
+                    : ''
                 }
                 readOnly
+                style={{
+                  background: 'transparent',
+                  color: 'inherit',
+                  border: 'none',
+                }}
               />
-            </div>
-            <div>
+            </label>
+            <label style={{ display: 'flex', flexDirection: 'column' }}>
               Heading (deg):
               <input
                 type="text"
                 value={
                   selectedTrack
                     ? Number(selectedTrack.heading).toFixed(2)
-                    : ""
+                    : ''
                 }
                 readOnly
+                style={{
+                  background: 'transparent',
+                  color: 'inherit',
+                  border: 'none',
+                }}
               />
-            </div>
+            </label>
           </form>
-          <button
-            onClick={() => setSelected(null)}
-            disabled={selectedTrack == null}
-          >
-            Clear selected track
-          </button>
         </div>
       </div>
     </div>
