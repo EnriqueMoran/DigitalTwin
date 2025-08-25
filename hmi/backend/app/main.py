@@ -55,10 +55,14 @@ TOPICS_FILE = Path(__file__).resolve().parents[3] / "shared" / "mqtt_topics.json
 with open(TOPICS_FILE) as f:
     _topics = json.load(f)["topics"]
 SENSOR_TOPICS = [t for t in _topics if t.startswith("sensor/")]
+LEGACY_TOPICS = [t for t in _topics if t.startswith("sim/")]
 TOPIC_SENSOR_GPS = next(t for t in SENSOR_TOPICS if t.endswith("/gps"))
 TOPIC_SENSOR_IMU = next(t for t in SENSOR_TOPICS if t.endswith("/imu"))
 TOPIC_SENSOR_BATTERY = next(t for t in SENSOR_TOPICS if t.endswith("/battery"))
 TOPIC_SENSOR_TRACK = next(t for t in SENSOR_TOPICS if t.endswith("/track"))
+TOPIC_SIM_GPS = next(t for t in LEGACY_TOPICS if t.endswith("/gps"))
+TOPIC_SIM_IMU = next(t for t in LEGACY_TOPICS if t.endswith("/imu"))
+TOPIC_SIM_BATTERY = next(t for t in LEGACY_TOPICS if t.endswith("/battery"))
 
 _prev_gps: Dict[str, Any] | None = None
 _prev_imu_ts: float | None = None
@@ -121,7 +125,7 @@ def _bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 def _on_connect(client: mqtt.Client, userdata, flags, rc):
-    for t in SENSOR_TOPICS:
+    for t in SENSOR_TOPICS + LEGACY_TOPICS:
         client.subscribe(t)
     client.subscribe("processed/radar")
     client.subscribe("procesed/radar")
@@ -140,7 +144,7 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         return
     LAST_MESSAGE_TIME = time.time()
 
-    if topic == TOPIC_SENSOR_GPS:
+    if topic in (TOPIC_SENSOR_GPS, TOPIC_SIM_GPS):
         lat = payload.get("lat")
         lon = payload.get("lon")
         alt = payload.get("alt")
@@ -162,7 +166,7 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
                     STATE["true_speed"] = dist / dt
         _prev_gps = {"lat": lat, "lon": lon, "ts": ts}
 
-    elif topic == TOPIC_SENSOR_IMU:
+    elif topic in (TOPIC_SENSOR_IMU, TOPIC_SIM_IMU):
         ax = payload.get("ax")
         ay = payload.get("ay")
         az = payload.get("az")
@@ -220,7 +224,7 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
             STATE["heading"] = _est_heading
         STATE["latency"] = LAST_MESSAGE_TIME - ts
 
-    elif topic == TOPIC_SENSOR_BATTERY:
+    elif topic in (TOPIC_SENSOR_BATTERY, TOPIC_SIM_BATTERY):
         soc = payload.get("soc")
         if soc is not None:
             if soc <= 1:

@@ -74,11 +74,11 @@
       "qos_recommended": 0,
       "schema": {
         "type": "object",
-        "required": ["distance", "bearing", "heading"],
+        "required": ["distance", "heading", "bearing"],
         "properties": {
           "distance": { "type": "number" },
-          "bearing": { "type": "number" },
-          "heading": { "type": "number" }
+          "heading": { "type": "number" },
+          "bearing": { "type": "number" }
         }
       }
     }
