@@ -64,7 +64,10 @@ class RadarSimulator:
         host = os.getenv("MQTT_HOST", "mosquitto")
         port = int(os.getenv("MQTT_PORT", "1883"))
         self.client = mqtt.Client()
+        self.client.on_connect = self._on_connect
+        self.client.on_message = self._on_gps
         self.client.connect(host, port, 60)
+        self.client.loop_start()
         self.running = False
 
     def _load_config(self) -> None:
@@ -87,6 +90,17 @@ class RadarSimulator:
             )
             for t in cfg.get("tracks", [])
         ]
+
+    def _on_connect(self, client, _userdata, _flags, _rc) -> None:
+        client.subscribe("sensor/gps")
+
+    def _on_gps(self, _client, _userdata, msg) -> None:
+        try:
+            data = json.loads(msg.payload.decode())
+            self.origin_lat = float(data.get("lat", self.origin_lat))
+            self.origin_lon = float(data.get("lon", self.origin_lon))
+        except Exception:
+            pass
 
     def _maybe_noisy(self, lat: float, lon: float) -> tuple[float, float]:
         if self.noise_prob <= 0.0 or self.noise_m <= 0.0:
@@ -127,6 +141,7 @@ class RadarSimulator:
 
     def stop(self) -> None:
         self.running = False
+        self.client.loop_stop()
         self.client.disconnect()
 
 

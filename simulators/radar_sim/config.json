@@ -1,6 +1,5 @@
 {
   "frequency_hz": 1,
-  "origin": { "lat": 0.0, "lon": 0.0 },
   "noise": { "probability": 0.1, "position_m": 1.0 },
   "tracks": [
     {"lat": 0.0, "lon": 0.001, "heading": 90, "speed": 1.5},
