@@ -7,13 +7,12 @@ This repository contains a digital twin of a radio‑controlled warship. The phy
 
 ## Features
 
-- Simulated roll, pitch, yaw, position and speed
 - Battery discharge model and seabed depth map
 - ESP32 telemetry multiplexer
 - MQTT broker (Mosquitto)
 - FastAPI backend with React frontend
-- Dockerised sensor simulators
-- MQTT recorder with replay capability, optional message logging, and configurable enable flag
+- Dockerised sensor simulators (ESP32, MPU9250, NEO M8N)
+- MQTT recorder with replay capability
 
 ## Repository structure
 

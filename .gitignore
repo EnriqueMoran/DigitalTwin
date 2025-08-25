@@ -210,3 +210,5 @@ hmi/frontend/node_modules/
 hmi/frontend/dist/
 hmi/frontend/public/boat.glb
 hmi/frontend/public/boat_top.png
+simulators/scenarios/*
+shared/recording.json
