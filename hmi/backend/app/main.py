@@ -37,6 +37,7 @@ STATE: Dict[str, Any] = {
     "battery_status": None,
     "gps_signal": None,
     "uptime": None,
+    "radar_tracks": [],
 }
 
 LAST_MESSAGE_TIME: float | None = None
@@ -85,6 +86,8 @@ def _bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 def _on_connect(client: mqtt.Client, userdata, flags, rc):
     client.subscribe(MQTT_TOPIC)
+    client.subscribe("processed/radar")
+    client.subscribe("procesed/radar")
 
 
 def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
@@ -192,6 +195,11 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
     elif topic == "sensor/status":
         ts = _parse_ts(payload.get("ts"))
         STATE["latency"] = LAST_MESSAGE_TIME - ts
+
+    elif topic in ("processed/radar", "procesed/radar"):
+        tracks = payload if isinstance(payload, list) else payload.get("tracks")
+        if isinstance(tracks, list):
+            STATE["radar_tracks"] = tracks
 
 async def _broadcast_loop():
     global _last_broadcast
