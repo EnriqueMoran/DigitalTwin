@@ -10,12 +10,12 @@ import SystemStatus from '../components/SystemStatus';
 import Widgets from '../components/Widgets';
 
 const panelOptions = [
-  { value: '3d', label: '3D Viewer', component: BoatViewer },
-  { value: 'gps', label: 'GPS Viewer', component: MapPanel },
-  { value: 'radar', label: 'Radar Viewer', component: RadarViewer },
-  { value: 'currentMission', label: 'Current Mission Viewer', component: CurrentMissionViewer },
-  { value: 'missionsManager', label: 'Missions Manager Viewer', component: MissionsManagerViewer },
-  { value: 'cameras', label: 'Cameras Viewer', component: CamerasViewer },
+  { value: '3d', label: '3D Model', component: BoatViewer },
+  { value: 'gps', label: 'GPS', component: MapPanel },
+  { value: 'radar', label: 'Radar', component: RadarViewer },
+  { value: 'currentMission', label: 'Current Mission', component: CurrentMissionViewer },
+  { value: 'missionsManager', label: 'Missions Manager', component: MissionsManagerViewer },
+  { value: 'cameras', label: 'Onboard Cameras', component: CamerasViewer },
 ];
 
 export default function MainScreen({ sensors }) {

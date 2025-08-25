@@ -18,6 +18,7 @@ publish_qos_gps = 1
 publish_qos_battery = 1
 validate_schema = true
 schema_path = ../../shared/mqtt_topics.json
+log_messages = true
 
 [topics]
 imu_in = sim/imu
@@ -43,6 +44,7 @@ publish_qos_imu = 0
 publish_qos_gps = 1
 publish_qos_battery = 2
 validate_schema = false
+log_messages = false
 
 [topics]
 imu_in = sim/imu
@@ -103,6 +105,7 @@ def test_read_config_populates_properties(tmp_path):
     # validation flags
     assert esp.validate_schema is True
     assert esp.schema_path == "../../shared/mqtt_topics.json"
+    assert esp.log_messages is True
 
     # mqtt client created
     assert esp.client is not None
@@ -131,6 +134,7 @@ def test_minimal_config_uses_defaults(tmp_path):
     assert esp.qos_imu == 0
     assert esp.qos_gps == 1
     assert esp.qos_batt == 1
+    assert esp.log_messages is False
 
 
 def test_broker_host_rejects_non_string():
@@ -191,6 +195,12 @@ def test_validate_schema_and_schema_path_setters():
         esp.validate_schema = "yes"
     with pytest.raises(TypeError):
         esp.schema_path = ""
+
+
+def test_log_messages_setter_rejects_non_bool():
+    esp = ESP32()
+    with pytest.raises(TypeError):
+        esp.log_messages = "yes"
 
 
 def test_start_without_read_config_raises():

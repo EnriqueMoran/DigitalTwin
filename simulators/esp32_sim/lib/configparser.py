@@ -37,6 +37,9 @@ class ESP32Parser:
     def parse_schema_path(self) -> str:
         return self.config["esp32"].get("schema_path", fallback="mqtt_topics_v1.json")
 
+    def parse_log_messages(self) -> bool:
+        return self.config["esp32"].getboolean("log_messages", fallback=False)
+
     #  Topics
     def parse_imu_in(self) -> str:
         return self.config["topics"].get("imu_in", fallback="sim/imu")

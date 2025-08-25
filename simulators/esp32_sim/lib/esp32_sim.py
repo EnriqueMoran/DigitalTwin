@@ -54,6 +54,8 @@ class ESP32:
         self._pub_seq = 0
         self._last_recv = {"imu": None, "gps": None, "battery": None}
 
+        self._log_messages: bool = False
+
 
     @property
     def broker_host(self) -> Optional[str]:
@@ -206,6 +208,16 @@ class ESP32:
             raise TypeError("schema_path must be a non-empty string")
         self._schema_path = val
 
+    @property
+    def log_messages(self) -> bool:
+        return self._log_messages
+
+    @log_messages.setter
+    def log_messages(self, val: bool) -> None:
+        if not isinstance(val, bool):
+            raise TypeError("log_messages must be a boolean")
+        self._log_messages = val
+
 
     def read_config(self) -> None:
         parser = ESP32Parser(self.config_file)
@@ -234,6 +246,7 @@ class ESP32:
 
         self.validate_schema = parser.parse_validate_schema()
         self.schema_path = parser.parse_schema_path()
+        self.log_messages = parser.parse_log_messages()
 
         self.client = mqtt.Client(client_id=self.client_id, clean_session=True)
         lwt_payload = json.dumps({"status": "offline", "ts": now_iso()})
@@ -325,7 +338,8 @@ class ESP32:
             LOG.warning("Received non-JSON payload on %s; discarding. Head: %.200s", topic, text[:200])
             return
 
-        LOG.info("RECV_PAYLOAD %s %s", topic, json.dumps(payload, separators=(",", ":"), ensure_ascii=False))
+        if self.log_messages:
+            LOG.info("RECV_PAYLOAD %s %s", topic, json.dumps(payload, separators=(",", ":"), ensure_ascii=False))
 
         if self.validate_schema:
             schema = self._find_schema_for_topic(topic)
@@ -379,15 +393,17 @@ class ESP32:
 
         out_payload = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
 
-        LOG.info("SEND %s %s", out_topic, out_payload)
+        if self.log_messages:
+            LOG.info("SEND %s %s", out_topic, out_payload)
 
         info = self.client.publish(out_topic, payload=out_payload, qos=qos, retain=False)
         rc = getattr(info, "rc", None)
         mid = getattr(info, "mid", None)
-        LOG.info(
-            "Forwarded %s -> %s (qos=%d) rc=%s mid=%s seq=%s sim_seq=%s",
-            topic, out_topic, qos, rc, mid, payload.get("seq"), payload.get("sim_seq"),
-        )
+        if self.log_messages:
+            LOG.info(
+                "Forwarded %s -> %s (qos=%d) rc=%s mid=%s seq=%s sim_seq=%s",
+                topic, out_topic, qos, rc, mid, payload.get("seq"), payload.get("sim_seq"),
+            )
 
 
     def start(self):
