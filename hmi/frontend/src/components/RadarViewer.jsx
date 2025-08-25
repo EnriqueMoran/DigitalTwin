@@ -152,6 +152,37 @@ export default function RadarViewer({ sensors }) {
                 >
                   {d}
                 </text>
+                <line
+                  x1={CENTER - offset}
+                  y1={CENTER - 4}
+                  x2={CENTER - offset}
+                  y2={CENTER + 4}
+                  stroke="#2d4f61"
+                />
+                <text
+                  x={CENTER - offset}
+                  y={CENTER + 16}
+                  fill="white"
+                  fontSize="10"
+                  textAnchor="middle"
+                >
+                  {d}
+                </text>
+                <line
+                  x1={CENTER - 4}
+                  y1={CENTER + offset}
+                  x2={CENTER + 4}
+                  y2={CENTER + offset}
+                  stroke="#2d4f61"
+                />
+                <text
+                  x={CENTER + 8}
+                  y={CENTER + offset + 10}
+                  fill="white"
+                  fontSize="10"
+                >
+                  {d}
+                </text>
               </g>
             );
           })}
@@ -194,8 +225,8 @@ export default function RadarViewer({ sensors }) {
         <div>
           <h4>Selected Track Info</h4>
           <form style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ display: 'flex', flexDirection: 'column' }}>
-              Distance (m):
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span>Distance (m):</span>
               <input
                 type="text"
                 value={
@@ -211,8 +242,8 @@ export default function RadarViewer({ sensors }) {
                 }}
               />
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column' }}>
-              Bearing (deg):
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span>Bearing (deg):</span>
               <input
                 type="text"
                 value={
@@ -228,8 +259,8 @@ export default function RadarViewer({ sensors }) {
                 }}
               />
             </label>
-            <label style={{ display: 'flex', flexDirection: 'column' }}>
-              Heading (deg):
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span>Heading (deg):</span>
               <input
                 type="text"
                 value={
