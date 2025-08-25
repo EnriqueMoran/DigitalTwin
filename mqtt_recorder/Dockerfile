@@ -2,5 +2,5 @@ FROM python:3.11-slim
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY session_service.py ./service.py
+COPY mqtt_recorder.py ./service.py
 CMD ["python", "service.py"]

@@ -13,7 +13,7 @@ This repository contains a digital twin of a radio‑controlled warship. The phy
 - MQTT broker (Mosquitto)
 - FastAPI backend with React frontend
 - Dockerised sensor simulators
-- MQTT session recorder with replay capability
+- MQTT recorder with replay capability
 
 ## Repository structure
 
@@ -23,7 +23,7 @@ DigitalTwin/
 ├─ simulators/      sensor simulators and ESP32 multiplexer
 ├─ hmi/             FastAPI backend and React user interface
 ├─ mosquitto/       MQTT broker configuration
-├─ mqtt_session/    recording and replay service
+├─ mqtt_recorder/   recording and replay service
 ├─ shared/          protocol definitions shared by all components
 └─ docker-compose.yml  orchestration for the full stack
 ```

@@ -7,7 +7,7 @@ from typing import List, Dict, Any
 
 import paho.mqtt.client as mqtt
 
-CONFIG_PATH = os.getenv("MQTT_SESSION_CONFIG", "config.json")
+CONFIG_PATH = os.getenv("MQTT_RECORDER_CONFIG", "config.json")
 
 def load_config(path: str) -> Dict[str, Any]:
     with open(path, 'r') as f:
@@ -76,8 +76,8 @@ if __name__ == '__main__':
     host = config.get('host', 'mosquitto')
     port = int(config.get('port', 1883))
     mode = config.get('mode', 'record')
-    save_file = config.get('save_file', '/data/session.json')
-    load_file = config.get('load_file', '/data/session.json')
+    save_file = config.get('save_file', '/data/recording.json')
+    load_file = config.get('load_file', '/data/recording.json')
     topics = config.get('topics', [])
 
     client = mqtt.Client()
