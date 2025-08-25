@@ -78,6 +78,19 @@ services:
     depends_on:
       - mosquitto
 
+  radar_sim:
+    build:
+      context: .
+      dockerfile: simulators/radar_sim/Dockerfile
+    container_name: radar_sim
+    volumes:
+      - ./shared:/app/simulators/shared:ro
+    environment:
+      - RUN_TESTS=0
+      - RADAR_SIM_CONFIG=/app/simulators/radar_sim/config.json
+    depends_on:
+      - mosquitto
+
   hmi_backend:
     build: ./hmi/backend
     container_name: hmi_backend

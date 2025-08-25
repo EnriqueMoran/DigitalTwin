@@ -56,13 +56,16 @@ with open(TOPICS_FILE) as f:
     _topics = json.load(f)["topics"]
 SENSOR_TOPICS = [t for t in _topics if t.startswith("sensor/")]
 LEGACY_TOPICS = [t for t in _topics if t.startswith("sim/")]
+PROCESSED_TOPICS = [t for t in _topics if t.startswith("processed/")]
 TOPIC_SENSOR_GPS = next(t for t in SENSOR_TOPICS if t.endswith("/gps"))
 TOPIC_SENSOR_IMU = next(t for t in SENSOR_TOPICS if t.endswith("/imu"))
 TOPIC_SENSOR_BATTERY = next(t for t in SENSOR_TOPICS if t.endswith("/battery"))
-TOPIC_SENSOR_TRACK = next(t for t in SENSOR_TOPICS if t.endswith("/track"))
+TOPIC_SENSOR_TRACK = next((t for t in SENSOR_TOPICS if t.endswith("/track")), None)
+TOPIC_SENSOR_RADAR = next((t for t in SENSOR_TOPICS if t.endswith("/radar")), None)
 TOPIC_SIM_GPS = next(t for t in LEGACY_TOPICS if t.endswith("/gps"))
 TOPIC_SIM_IMU = next(t for t in LEGACY_TOPICS if t.endswith("/imu"))
 TOPIC_SIM_BATTERY = next(t for t in LEGACY_TOPICS if t.endswith("/battery"))
+TOPIC_PROCESSED_RADAR = next((t for t in PROCESSED_TOPICS if t.endswith("/radar")), None)
 
 _prev_gps: Dict[str, Any] | None = None
 _prev_imu_ts: float | None = None
@@ -125,10 +128,8 @@ def _bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 def _on_connect(client: mqtt.Client, userdata, flags, rc):
-    for t in SENSOR_TOPICS + LEGACY_TOPICS:
+    for t in SENSOR_TOPICS + LEGACY_TOPICS + PROCESSED_TOPICS:
         client.subscribe(t)
-    client.subscribe("processed/radar")
-    client.subscribe("procesed/radar")
 
 
 def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
@@ -237,14 +238,17 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         ts = _parse_ts(payload.get("ts"))
         STATE["latency"] = LAST_MESSAGE_TIME - ts
 
-    elif topic == TOPIC_SENSOR_TRACK:
+    elif TOPIC_SENSOR_TRACK and topic == TOPIC_SENSOR_TRACK:
         dist = payload.get("distance")
         bear = payload.get("bearing")
         head = payload.get("heading")
         if dist is not None and bear is not None and head is not None:
             _update_radar_track(float(dist), float(bear), float(head))
 
-    elif topic in ("processed/radar", "procesed/radar"):
+    elif (
+        (TOPIC_SENSOR_RADAR and topic == TOPIC_SENSOR_RADAR)
+        or (TOPIC_PROCESSED_RADAR and topic == TOPIC_PROCESSED_RADAR)
+    ):
         tracks = payload if isinstance(payload, list) else payload.get("tracks")
         if isinstance(tracks, list):
             now_t = time.time()

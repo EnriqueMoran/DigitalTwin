@@ -81,6 +81,35 @@
           "bearing": { "type": "number" }
         }
       }
+    },
+    "sensor/radar": {
+      "description": "Radar track list",
+      "direction": "publisher=radar, subscriber=station",
+      "qos_recommended": 0,
+      "schema": {
+        "type": "object",
+        "required": ["tracks"],
+        "properties": {
+          "tracks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["distance", "bearing", "heading"],
+              "properties": {
+                "distance": { "type": "number" },
+                "bearing": { "type": "number" },
+                "heading": { "type": "number" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "processed/radar": {
+      "description": "Processed radar tracks",
+      "direction": "publisher=station, subscriber=clients",
+      "qos_recommended": 0,
+      "schema": { "$ref": "#/topics/sensor/radar/schema" }
     }
   }
 }
