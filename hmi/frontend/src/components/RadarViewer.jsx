@@ -226,7 +226,7 @@ export default function RadarViewer({ sensors }) {
           <h4>Selected Track Info</h4>
           <form style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span>Distance (m):</span>
+              <span style={{marginRight: 10}}>Distance (m):</span>
               <input
                 type="text"
                 value={
@@ -243,12 +243,12 @@ export default function RadarViewer({ sensors }) {
               />
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span>Bearing (deg):</span>
+              <span style={{marginRight: 5}}>Bearing (deg):</span>
               <input
                 type="text"
                 value={
                   selectedTrack
-                    ? Number(selectedTrack.bearing).toFixed(2)
+                    ? Number(selectedTrack.bearing).toFixed(0)
                     : ''
                 }
                 readOnly
@@ -265,7 +265,7 @@ export default function RadarViewer({ sensors }) {
                 type="text"
                 value={
                   selectedTrack
-                    ? Number(selectedTrack.heading).toFixed(2)
+                    ? Number(selectedTrack.heading).toFixed(0)
                     : ''
                 }
                 readOnly
