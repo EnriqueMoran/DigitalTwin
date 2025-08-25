@@ -4,6 +4,7 @@ import os
 import time
 from datetime import datetime
 from math import atan2, cos, radians, sin, sqrt, pi
+from pathlib import Path
 from typing import Dict, Any, Set
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -37,6 +38,7 @@ STATE: Dict[str, Any] = {
     "battery_status": None,
     "gps_signal": None,
     "uptime": None,
+    "radar_tracks": [],
 }
 
 LAST_MESSAGE_TIME: float | None = None
@@ -48,12 +50,47 @@ _last_processed: float = 0.0
 
 MQTT_HOST = os.getenv("MQTT_HOST", "mosquitto")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
-MQTT_TOPIC = os.getenv("MQTT_TOPIC", "sensor/#")
+
+TOPICS_FILE = Path(__file__).resolve().parents[3] / "shared" / "mqtt_topics.json"
+with open(TOPICS_FILE) as f:
+    _topics = json.load(f)["topics"]
+SENSOR_TOPICS = [t for t in _topics if t.startswith("sensor/")]
+TOPIC_SENSOR_GPS = next(t for t in SENSOR_TOPICS if t.endswith("/gps"))
+TOPIC_SENSOR_IMU = next(t for t in SENSOR_TOPICS if t.endswith("/imu"))
+TOPIC_SENSOR_BATTERY = next(t for t in SENSOR_TOPICS if t.endswith("/battery"))
+TOPIC_SENSOR_TRACK = next(t for t in SENSOR_TOPICS if t.endswith("/track"))
 
 _prev_gps: Dict[str, Any] | None = None
 _prev_imu_ts: float | None = None
 _est_velocity: float = 0.0
 _est_heading: float = 0.0
+_radar_tracks_internal: list[Dict[str, Any]] = []
+
+TRACK_DISTANCE_MAX = 5.0
+TRACK_BEARING_MAX = 5.0
+TRACK_HEADING_MAX = 5.0
+TRACK_TIMEOUT = 5.0
+
+
+def _update_radar_track(distance: float, bearing: float, heading: float) -> None:
+    now = time.time()
+    for trk in _radar_tracks_internal:
+        if (
+            abs(trk["distance"] - distance) <= TRACK_DISTANCE_MAX
+            and abs(trk["bearing"] - bearing) <= TRACK_BEARING_MAX
+            and abs(trk["heading"] - heading) <= TRACK_HEADING_MAX
+        ):
+            trk.update({"distance": distance, "bearing": bearing, "heading": heading, "last_seen": now})
+            break
+    else:
+        _radar_tracks_internal.append(
+            {"distance": distance, "bearing": bearing, "heading": heading, "last_seen": now}
+        )
+    _radar_tracks_internal[:] = [t for t in _radar_tracks_internal if now - t["last_seen"] <= TRACK_TIMEOUT]
+    STATE["radar_tracks"] = [
+        {"distance": t["distance"], "bearing": t["bearing"], "heading": t["heading"]}
+        for t in _radar_tracks_internal
+    ]
 
 
 def _parse_ts(ts: str | None) -> float:
@@ -84,7 +121,10 @@ def _bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 def _on_connect(client: mqtt.Client, userdata, flags, rc):
-    client.subscribe(MQTT_TOPIC)
+    for t in SENSOR_TOPICS:
+        client.subscribe(t)
+    client.subscribe("processed/radar")
+    client.subscribe("procesed/radar")
 
 
 def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
@@ -100,7 +140,7 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         return
     LAST_MESSAGE_TIME = time.time()
 
-    if topic == "sensor/gps":
+    if topic == TOPIC_SENSOR_GPS:
         lat = payload.get("lat")
         lon = payload.get("lon")
         alt = payload.get("alt")
@@ -122,7 +162,7 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
                     STATE["true_speed"] = dist / dt
         _prev_gps = {"lat": lat, "lon": lon, "ts": ts}
 
-    elif topic == "sensor/imu":
+    elif topic == TOPIC_SENSOR_IMU:
         ax = payload.get("ax")
         ay = payload.get("ay")
         az = payload.get("az")
@@ -180,7 +220,7 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
             STATE["heading"] = _est_heading
         STATE["latency"] = LAST_MESSAGE_TIME - ts
 
-    elif topic == "sensor/battery":
+    elif topic == TOPIC_SENSOR_BATTERY:
         soc = payload.get("soc")
         if soc is not None:
             if soc <= 1:
@@ -192,6 +232,31 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
     elif topic == "sensor/status":
         ts = _parse_ts(payload.get("ts"))
         STATE["latency"] = LAST_MESSAGE_TIME - ts
+
+    elif topic == TOPIC_SENSOR_TRACK:
+        dist = payload.get("distance")
+        bear = payload.get("bearing")
+        head = payload.get("heading")
+        if dist is not None and bear is not None and head is not None:
+            _update_radar_track(float(dist), float(bear), float(head))
+
+    elif topic in ("processed/radar", "procesed/radar"):
+        tracks = payload if isinstance(payload, list) else payload.get("tracks")
+        if isinstance(tracks, list):
+            now_t = time.time()
+            _radar_tracks_internal[:] = [
+                {
+                    "distance": float(t.get("distance", 0)),
+                    "bearing": float(t.get("bearing", 0)),
+                    "heading": float(t.get("heading", 0)),
+                    "last_seen": now_t,
+                }
+                for t in tracks
+            ]
+            STATE["radar_tracks"] = [
+                {"distance": t["distance"], "bearing": t["bearing"], "heading": t["heading"]}
+                for t in _radar_tracks_internal
+            ]
 
 async def _broadcast_loop():
     global _last_broadcast
