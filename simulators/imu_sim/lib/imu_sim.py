@@ -273,7 +273,7 @@ class MPU9250:
 
     @property
     def mag_odr_hz(self) -> float | None:
-        return getattr(self, "_mag_odr", None)
+        return self._mag_odr
             
 
     def read_config(self):

@@ -18,15 +18,17 @@ LOG = logging.getLogger("imu_sim.bridge")
 
 
 def now_iso() -> str:
-    """Return ISO-8601 UTC timestamp with milliseconds and trailing 'Z'."""
+    # Return ISO-8601 UTC timestamp with milliseconds and trailing 'Z'.
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 class IMUPublisher:
     def __init__(self, config_path: str = "./simulators/imu_sim/config.ini"):
+        # Initialize config and IMU simulator
         self.config_path = Path(config_path)
         self.imu = MPU9250(str(self.config_path))
 
+        # MQTT defaults
         self.broker_host: str = "localhost"
         self.broker_port: int = 1883
         self.client_id: str = "imu_sim"
@@ -106,9 +108,8 @@ class IMUPublisher:
             self.log_messages,
         )
 
-
     def _load_schema(self) -> None:
-        """Load outgoing schema for the configured topic. If it fails, disable validation."""
+        # Load outgoing schema for the configured topic. If it fails, disable validation.
         if not self.schema_path:
             LOG.error("validate_schema requested but schema_path not provided in INI")
             self.validate_schema = False
@@ -144,7 +145,7 @@ class IMUPublisher:
                           mag_seed: Optional[int] = 1,
                           accel_lpf_hz: float = 100.0,
                           gyro_lpf_hz: float = 98.0) -> None:
-        """Read IMU config and initialize the internal simulators."""
+        # Read IMU config and initialize the internal simulators.
         LOG.info("Reading IMU config from %s", self.config_path)
         self.imu.read_config()
         self.imu.init_all_sims(
@@ -155,8 +156,8 @@ class IMUPublisher:
             gyro_lpf_cut_hz=gyro_lpf_hz,
         )
 
-
     def _setup_mqtt_client(self) -> None:
+        # Prepare MQTT client and LWT
         self.client = mqtt.Client(client_id=self.client_id)
         try:
             lwt_payload = json.dumps({"status": "offline", "ts": now_iso()})
@@ -166,7 +167,6 @@ class IMUPublisher:
 
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
-
 
     def _on_connect(self, client, userdata, flags, rc):
         if rc == 0:
@@ -179,13 +179,11 @@ class IMUPublisher:
         else:
             LOG.error("MQTT connect failed with rc=%s", rc)
 
-
     def _on_disconnect(self, client, userdata, rc):
         LOG.warning("Disconnected from broker (rc=%s)", rc)
 
-
     def start(self) -> None:
-        """Start publishing loop (blocks until stop())."""
+        # Start publishing loop (blocks until stop()).
         if not hasattr(self.imu, "_accel_sim") or not hasattr(self.imu, "_gyro_sim"):
             raise RuntimeError("Call read_and_init_imu() before start()")
 
@@ -203,15 +201,26 @@ class IMUPublisher:
         except Exception:
             LOG.debug("Failed to publish online status on start")
 
+        # Compute sample intervals from configured ODRs
         dt_acc = 1.0 / float(self.imu.accel_odr_hz)
         dt_gyro = 1.0 / float(self.imu.gyro_odr_hz)
         dt_mag = 1.0 / float(self.imu.mag_odr_hz)
+
+        # Next-sample timestamps
         t_next_acc = time.time()
         t_next_gyro = time.time()
         t_next_mag = time.time()
+
+        # Last sampled values
         last_acc = [0.0, 0.0, 0.0]
         last_gyro = [0.0, 0.0, 0.0]
         last_mag = [0.0, 0.0, 0.0]
+
+        # Last sample timestamps (seconds since epoch)
+        last_acc_ts = 0.0
+        last_gyro_ts = 0.0
+        last_mag_ts = 0.0
+
         sim_start = time.time()
 
         self._running = True
@@ -228,67 +237,89 @@ class IMUPublisher:
             while self._running:
                 now_t = time.time()
                 sim_t = now_t - sim_start
+                sampled = False
 
+                # Compute motion only when a sensor needs sampling
                 if now_t >= t_next_acc or now_t >= t_next_gyro or now_t >= t_next_mag:
                     a_lin, omega, R = self.route.imu_motion(sim_t)
 
+                # Sample accelerometer when scheduled
                 if now_t >= t_next_acc:
                     _, a_g = self.imu.sample_accel(a_lin, R)
                     last_acc = [float(a_g[0]), float(a_g[1]), float(a_g[2])]
+                    last_acc_ts = now_t
                     t_next_acc += dt_acc
+                    sampled = True
 
+                # Sample gyroscope when scheduled
                 if now_t >= t_next_gyro:
                     _, w = self.imu.sample_gyro(omega, R)
                     last_gyro = [float(w[0]), float(w[1]), float(w[2])]
+                    last_gyro_ts = now_t
                     t_next_gyro += dt_gyro
+                    sampled = True
 
+                # Sample magnetometer when scheduled
                 if now_t >= t_next_mag:
                     _, m = self.imu.sample_mag(R)
                     last_mag = [float(m[0]), float(m[1]), float(m[2])]
+                    last_mag_ts = now_t
                     t_next_mag += dt_mag
+                    sampled = True
 
-                payload = {
-                    "ax": last_acc[0],
-                    "ay": last_acc[1],
-                    "az": last_acc[2],
-                    "gx": last_gyro[0],
-                    "gy": last_gyro[1],
-                    "gz": last_gyro[2],
-                    "mx": last_mag[0],
-                    "my": last_mag[1],
-                    "mz": last_mag[2],
-                    "ts": now_iso(),
-                    "seq": int(self._seq),
-                }
-                self._seq += 1
+                # Publish only if at least one sensor sampled now
+                if sampled:
+                    # Use the most recent sample time as payload timestamp
+                    latest_sample_ts = max(last_acc_ts, last_gyro_ts, last_mag_ts)
+                    ts_iso = datetime.fromtimestamp(latest_sample_ts, timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
-                if self.validate_schema and self._schema is not None:
+                    payload = {
+                        "ax": last_acc[0],
+                        "ay": last_acc[1],
+                        "az": last_acc[2],
+                        "gx": last_gyro[0],
+                        "gy": last_gyro[1],
+                        "gz": last_gyro[2],
+                        "mx": last_mag[0],
+                        "my": last_mag[1],
+                        "mz": last_mag[2],
+                        "ts": ts_iso,
+                        "seq": int(self._seq),
+                    }
+                    self._seq += 1
+
+                    if self.validate_schema and self._schema is not None:
+                        try:
+                            validate(instance=payload, schema=self._schema)
+                        except ValidationError as ve:
+                            LOG.warning("Outgoing payload failed schema validation: %s", ve.message)
+                            continue
+
+                    if self.log_messages:
+                        try:
+                            log_msg = {"topic": self.topic, "ts_local": now_iso(), "payload": payload}
+                            LOG.info(json.dumps(log_msg, separators=(",", ":"), ensure_ascii=False))
+                        except Exception:
+                            LOG.debug("Failed to log outgoing message")
+
                     try:
-                        validate(instance=payload, schema=self._schema)
-                    except ValidationError as ve:
-                        LOG.warning("Outgoing payload failed schema validation: %s", ve.message)
-                        time.sleep(0.0005)
-                        continue
+                        self.client.publish(self.topic, json.dumps(payload, separators=(",", ":")), qos=self.qos, retain=False)
+                        LOG.debug("Published seq=%s to %s", payload["seq"], self.topic)
+                    except Exception as e:
+                        LOG.warning("Failed to publish: %s", e)
 
-                if self.log_messages:
-                    try:
-                        log_msg = {"topic": self.topic, "ts_local": now_iso(), "payload": payload}
-                        LOG.info(json.dumps(log_msg, separators=(",", ":"), ensure_ascii=False))
-                    except Exception:
-                        LOG.debug("Failed to log outgoing message")
+                # Sleep until the next scheduled sample to avoid busy loop
+                next_events = [t_next_acc, t_next_gyro, t_next_mag]
+                sleep_until = min(next_events) - time.time()
+                if sleep_until > 0:
+                    time.sleep(min(max(sleep_until, 0.001), 0.1))
+                else:
+                    time.sleep(0.001)
 
-                try:
-                    self.client.publish(self.topic, json.dumps(payload, separators=(",", ":")), qos=self.qos, retain=False)
-                    LOG.debug("Published seq=%s to %s", payload["seq"], self.topic)
-                except Exception as e:
-                    LOG.warning("Failed to publish: %s", e)
-
-                time.sleep(0.0005)
         except KeyboardInterrupt:
             LOG.info("Keyboard interrupt received; stopping")
         finally:
             self.stop()
-
 
     def stop(self) -> None:
         LOG.info("Stopping IMU MQTT publisher")
