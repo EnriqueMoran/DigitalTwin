@@ -23,7 +23,8 @@ export default function SensorData({ sensors = {} }) {
   const fmtLatLon = (v) => {
     if (v === undefined || v === null) return 'Null';
     const dec = Number(v).toFixed(12);
-    return `${toDMS(v)} (${dec})`;
+    const extraSpace = v >= 0 ? ' ' : '';
+    return `${toDMS(v)}${extraSpace} (${dec})`;
   };
 
   const fields = [
@@ -34,7 +35,6 @@ export default function SensorData({ sensors = {} }) {
     ['Roll (deg)', fmt(sensors.roll, '', toDeg)],
     ['Pitch (deg)', fmt(sensors.pitch, '', toDeg)],
     ['Estimated speed (m/s)', fmt(sensors.estimated_speed, '', toFixed(3))],
-    ['E.S. Confidence', fmt(sensors.estimated_speed_confidence, '%')],
     ['True speed (m/s)', fmt(sensors.true_speed, '', toFixed(3))],
     ['Rate of turn (deg/s)', fmt(sensors.rate_of_turn, '', toDeg)],
   ];
