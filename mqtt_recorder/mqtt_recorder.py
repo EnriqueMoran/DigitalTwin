@@ -3,11 +3,18 @@ import json
 import time
 import base64
 import signal
+import logging
+from datetime import datetime, timezone
 from typing import List, Dict, Any
 
 import paho.mqtt.client as mqtt
 
 CONFIG_PATH = os.getenv("MQTT_RECORDER_CONFIG", "config.json")
+LOG = logging.getLogger("mqtt_recorder")
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 def load_config(path: str) -> Dict[str, Any]:
     with open(path, 'r') as f:
@@ -22,6 +29,12 @@ def decode_payload(payload: str) -> bytes:
 
 def record_mode(client: mqtt.Client, save_file: str) -> None:
     messages: List[Dict[str, Any]] = []
+
+    if save_file:
+        save_dir = os.path.dirname(save_file)
+        if save_dir:
+            os.makedirs(save_dir, exist_ok=True)
+        open(save_file, 'w').close()
 
     def on_message(_client, _userdata, msg):
         messages.append({
@@ -50,7 +63,7 @@ def matches_topic(topic_filters: List[str], topic: str) -> bool:
     return any(mqtt.topic_matches_sub(filt, topic) for filt in topic_filters)
 
 
-def replay_mode(client: mqtt.Client, load_file: str, topics: List[str]) -> None:
+def replay_mode(client: mqtt.Client, load_file: str, topics: List[str], log_messages: bool) -> None:
     with open(load_file, 'r') as f:
         messages = json.load(f)
 
@@ -68,7 +81,19 @@ def replay_mode(client: mqtt.Client, load_file: str, topics: List[str]) -> None:
         target_time = replay_start + (msg['timestamp'] - start_time)
         while time.time() < target_time:
             time.sleep(0.01)
-        client.publish(msg['topic'], decode_payload(msg['payload']))
+        payload = decode_payload(msg['payload'])
+        client.publish(msg['topic'], payload)
+
+        if log_messages:
+            try:
+                log_msg = {
+                    "topic": msg['topic'],
+                    "ts_local": now_iso(),
+                    "payload": msg['payload'],
+                }
+                LOG.info(json.dumps(log_msg, separators=(",", ":"), ensure_ascii=False))
+            except Exception:
+                LOG.debug("Failed to log outgoing message")
 
 
 if __name__ == '__main__':
@@ -79,6 +104,9 @@ if __name__ == '__main__':
     save_file = config.get('save_file', '/data/recording.json')
     load_file = config.get('load_file', '/data/recording.json')
     topics = config.get('topics', [])
+    log_messages = bool(config.get('log_messages', False))
+
+    logging.basicConfig(level=logging.INFO if log_messages else logging.WARNING)
 
     client = mqtt.Client()
     client.connect(host, port)
@@ -86,6 +114,6 @@ if __name__ == '__main__':
     if mode == 'record':
         record_mode(client, save_file)
     elif mode == 'replay':
-        replay_mode(client, load_file, topics)
+        replay_mode(client, load_file, topics, log_messages)
     else:
         raise ValueError(f"Unknown mode: {mode}")
