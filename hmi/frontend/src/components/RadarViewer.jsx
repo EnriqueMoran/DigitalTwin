@@ -7,7 +7,7 @@ const HEADING_LEN = 12;
 
 export default function RadarViewer({ sensors }) {
   const tracks = sensors?.radar_tracks ?? [];
-  const [range, setRange] = useState(1000); // meters
+  const [range, setRange] = useState(10); // meters
   const [showInfo, setShowInfo] = useState(true);
   const [selected, setSelected] = useState(null);
 
@@ -111,6 +111,45 @@ export default function RadarViewer({ sensors }) {
             stroke="#2d4f61"
             strokeWidth={1}
           />
+          {[0.25, 0.5, 0.75].map((p) => {
+            const d = (range * p).toFixed(2);
+            const offset = CENTER * p;
+            return (
+              <g key={p}>
+                <line
+                  x1={CENTER + offset}
+                  y1={CENTER - 4}
+                  x2={CENTER + offset}
+                  y2={CENTER + 4}
+                  stroke="#2d4f61"
+                />
+                <text
+                  x={CENTER + offset}
+                  y={CENTER + 16}
+                  fill="white"
+                  fontSize="10"
+                  textAnchor="middle"
+                >
+                  {d}
+                </text>
+                <line
+                  x1={CENTER - 4}
+                  y1={CENTER - offset}
+                  x2={CENTER + 4}
+                  y2={CENTER - offset}
+                  stroke="#2d4f61"
+                />
+                <text
+                  x={CENTER + 8}
+                  y={CENTER - offset - 2}
+                  fill="white"
+                  fontSize="10"
+                >
+                  {d}
+                </text>
+              </g>
+            );
+          })}
           {visibleTracks.map(renderTrack)}
         </svg>
       </div>
@@ -120,9 +159,9 @@ export default function RadarViewer({ sensors }) {
             View range (m): {range}
             <input
               type="range"
-              min="100"
-              max="5000"
-              step="100"
+              min="1"
+              max="10"
+              step="1"
               value={range}
               onChange={(e) => setRange(Number(e.target.value))}
             />
@@ -138,15 +177,53 @@ export default function RadarViewer({ sensors }) {
             Show tracks info
           </label>
         </div>
-        {selectedTrack && (
-          <div>
-            <h4>Selected Track Info</h4>
-            <div>Distance (m): {Number(selectedTrack.distance).toFixed(2)}</div>
-            <div>Bearing (deg): {Number(selectedTrack.bearing).toFixed(2)}</div>
-            <div>Heading (deg): {Number(selectedTrack.heading).toFixed(2)}</div>
-            <button onClick={() => setSelected(null)}>Clear selected track</button>
-          </div>
-        )}
+        <div>
+          <h4>Selected Track Info</h4>
+          <form>
+            <div>
+              Distance (m):
+              <input
+                type="text"
+                value={
+                  selectedTrack
+                    ? Number(selectedTrack.distance).toFixed(2)
+                    : ""
+                }
+                readOnly
+              />
+            </div>
+            <div>
+              Bearing (deg):
+              <input
+                type="text"
+                value={
+                  selectedTrack
+                    ? Number(selectedTrack.bearing).toFixed(2)
+                    : ""
+                }
+                readOnly
+              />
+            </div>
+            <div>
+              Heading (deg):
+              <input
+                type="text"
+                value={
+                  selectedTrack
+                    ? Number(selectedTrack.heading).toFixed(2)
+                    : ""
+                }
+                readOnly
+              />
+            </div>
+          </form>
+          <button
+            onClick={() => setSelected(null)}
+            disabled={selectedTrack == null}
+          >
+            Clear selected track
+          </button>
+        </div>
       </div>
     </div>
   );
