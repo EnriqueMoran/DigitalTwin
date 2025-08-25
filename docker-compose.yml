@@ -12,6 +12,15 @@ services:
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log
 
+  mqtt_session:
+    build: ./mqtt_session
+    container_name: mqtt_session
+    volumes:
+      - ./shared:/data
+      - ./mqtt_session/config.json:/app/config.json:ro
+    depends_on:
+      - mosquitto
+
   esp32_sim:
     build:
       context: .
