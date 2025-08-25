@@ -1,66 +1,54 @@
 # Digital Twin of RC Warship
 
-This repository hosts the code and documentation for a digital twin of a radio-controlled warship replica.
-The physical model measures **60.5 × 8.5 × 17 cm** and is equipped with sensors and communication hardware based on an ESP32 microcontroller.
+This repository contains a digital twin of a radio‑controlled warship. The physical craft (60.5 × 8.5 × 17 cm) is based on an ESP32 microcontroller with multiple sensors. The project mirrors that setup with containerised simulators, an MQTT broker and a web human–machine interface (HMI).
 
-The initial digital twin models the following parameters and systems:
+<img src="./hmi_example.gif" alt="App features" style="display:block; width:80%; height:auto; margin:0 auto;" />
 
-- Roll
-- Pitch
-- Yaw
-- Position
-- Speed over water
-- Battery autonomy
-- Seabed depth map
 
-The project is split between onboard firmware, a containerized HMI, and several sensor simulators.
+## Features
+
+- Simulated roll, pitch, yaw, position and speed
+- Battery discharge model and seabed depth map
+- ESP32 telemetry multiplexer
+- MQTT broker (Mosquitto)
+- FastAPI backend with React frontend
+- Dockerised sensor simulators
+
+## Repository structure
 
 ```text
 DigitalTwin/
-├─ boat/                          # code running onboard (ESP32)
-│  ├─ firmware/                   # Arduino/ESP-IDF sketches for ESP32
-│  │  └─ telemetry.ino            # reads sensors and sends telemetry as JSON via WiFi/UDP
-│  └─ docs/                       # wiring diagrams, sensor list, hardware notes
-│
-├─ simulators/                    # dockerized simulators
-│  ├─ imu_sim/                    # IMU (roll, pitch, yaw, accel, gyro, mag)
-│  ├─ gps_sim/                    # GPS (lat, lon, speed)
-│  ├─ battery_sim/                # battery voltage/current curve
-│  └─ esp32_sim/                  # collects sensors and forwards telemetry
-│
-├─ hmi/                           # human–machine interface (backend + frontend)
-│  ├─ backend/                    # FastAPI backend services and API
-│  └─ frontend/                   # React UI
-│
-├─ docker-compose.yml             # orchestrates HMI + simulators
-└─ shared/                        # common definitions between boat and HMI
-   ├─ protocols/                  # JSON message formats, protocol constants
-   └─ docs/                       # specification documentation, flow diagrams
+├─ boat/            ESP32 firmware and hardware documentation
+├─ simulators/      sensor simulators and ESP32 multiplexer
+├─ hmi/             FastAPI backend and React user interface
+├─ mosquitto/       MQTT broker configuration
+├─ shared/          protocol definitions shared by all components
+└─ docker-compose.yml  orchestration for the full stack
 ```
 
-## Running with Docker
+## Requirements
 
-Build and start the full environment (HMI plus simulators):
+- Docker 24+ with Docker Compose v2
+
+
+## Quick start
+
+Launch the entire system:
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
-This launches the HMI backend on port `8001` and the frontend on `3000` alongside containers for each simulator. Telemetry flows from the simulators to the ESP32 multiplexer simulator and finally to the HMI for processing and visualization.
+The backend is available at <http://localhost:8001> and the frontend at <http://localhost:3000>. Telemetry from the simulators flows through Mosquitto to the HMI for processing and visualisation.
 
-Build and start one single component:
+Run a single service:
+
 ```bash
 docker compose up --build imu_sim
 ```
 
+## Future plans
 
-
-## Future Plans
-
-Long-term goals for the digital twin include:
-
-- Adding onboard cameras for obstacle detection.
-- Sending automated radio-control commands, turning the boat into a USV (Unmanned Surface Vehicle).
-- Including a mission viewer to review completed runs.
-
-This structure provides a foundation for further development of the digital twin and associated tooling.
+- Integrate onboard cameras for obstacle detection
+- Add autonomous control for unmanned surface vehicle operation
+- Provide a mission viewer for analysing completed runs
