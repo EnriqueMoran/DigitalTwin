@@ -7,19 +7,12 @@ body {
 
 .top-nav {
   display: flex;
-  gap: 1rem;
   background: #222;
   color: #fff;
   padding: 0.5rem 1rem;
   align-items: center;
 }
-.top-nav a {
-  color: #fff;
-  text-decoration: none;
-  margin-right: 1rem;
-}
 .connection {
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 0.5rem;

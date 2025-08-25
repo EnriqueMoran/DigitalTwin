@@ -1,8 +1,6 @@
-import { Link, Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import MainScreen from './screens/Main';
-import MissionsScreen from './screens/Missions';
-import CameraScreen from './screens/Camera';
 
 function App() {
   const [data, setData] = useState({ sensors: {}, last_message_time: null });
@@ -23,9 +21,6 @@ function App() {
   return (
     <>
       <nav className="top-nav">
-        <Link to="/">Main</Link>
-        <Link to="/missions">Missions</Link>
-        <Link to="/camera">Camera</Link>
         <span className="connection">
           <span className={`dot ${active ? 'green' : 'red'}`}></span>
           {active ? 'Active' : 'Inactive'}
@@ -39,8 +34,6 @@ function App() {
           path="/"
           element={<MainScreen sensors={{ ...data.sensors, connection_state: active ? 'Active' : 'Inactive' }} />}
         />
-        <Route path="/missions" element={<MissionsScreen />} />
-        <Route path="/camera" element={<CameraScreen />} />
       </Routes>
     </>
   );
