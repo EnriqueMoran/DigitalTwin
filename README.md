@@ -2,7 +2,7 @@
 
 This repository contains a digital twin of a radio‑controlled warship. The physical craft (60.5 × 8.5 × 17 cm) is based on an ESP32 microcontroller with multiple sensors. The project mirrors that setup with containerised simulators, an MQTT broker and a web human–machine interface (HMI).
 
-<img src="./hmi_example.gif" alt="App features" style="display:block; width:80%; height:auto; margin:0 auto;" />
+<img src="./hmi_example.gif" alt="App features" style="display:block; width:100%; height:auto; margin:0 auto;" />
 
 
 ## Features
