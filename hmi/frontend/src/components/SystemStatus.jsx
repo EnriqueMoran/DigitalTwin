@@ -16,6 +16,7 @@ export default function SystemStatus({ sensors = {} }) {
       : sensors.connection_state ?? 'Null';
   const fields = [
     ['Connection state', connectionDisplay],
+    ['Mode', fmt(sensors.mode)],
     ['IMU temperature (deg)', fmt(sensors.imu_temperature)],
     ['Latency (s)', fmt(sensors.latency, '', toFixed(3))],
     ['Battery status (%)', fmt(sensors.battery_status, '%', toPercent)],
