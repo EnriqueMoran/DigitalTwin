@@ -183,6 +183,17 @@ body {
   padding: 0.25rem;
 }
 
+.context-menu {
+  position: absolute;
+  background: #222;
+  border: 1px solid #444;
+  color: #fff;
+  padding: 0.25rem 0.5rem;
+  z-index: 2000;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 .overlay {
   position: absolute;
   top: 0;

@@ -52,6 +52,7 @@ export default function MapPanel({
   const [follow, setFollow] = useState(true);
   const [position, setPosition] = useState(null);
   const [showMission, setShowMission] = useState(false);
+  const [contextMenu, setContextMenu] = useState(null);
 
   useEffect(() => { sensorsRef.current = sensors; }, [sensors]);
   useEffect(() => { followRef.current = follow; }, [follow]);
@@ -137,6 +138,19 @@ export default function MapPanel({
 
     mapInstance.off('dragstart', stopFollow);
     mapInstance.on('dragstart', stopFollow);
+
+    mapInstance.on('contextmenu', (e) => {
+      e.originalEvent.preventDefault();
+      setContextMenu({
+        lat: e.latlng.lat,
+        lon: e.latlng.lng,
+        x: e.containerPoint.x,
+        y: e.containerPoint.y,
+      });
+    });
+
+    mapInstance.on('click', () => setContextMenu(null));
+    mapInstance.on('movestart', () => setContextMenu(null));
   }, []);
 
   useEffect(() => {
@@ -179,6 +193,13 @@ export default function MapPanel({
     handleCenter();
   };
 
+  const handleCopyCoords = () => {
+    if (!contextMenu) return;
+    const text = `${contextMenu.lat.toFixed(6)}, ${contextMenu.lon.toFixed(6)}`;
+    navigator.clipboard?.writeText(text);
+    setContextMenu(null);
+  };
+
   const missionWps = selectedMission ? missions[selectedMission] || [] : [];
   const activeIdx =
     currentMission === selectedMission ? currentWpIdx : 0;
@@ -212,6 +233,15 @@ export default function MapPanel({
           Mission points
         </button>
       </div>
+      {contextMenu && (
+        <div
+          className="context-menu"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+          onClick={handleCopyCoords}
+        >
+          {contextMenu.lat.toFixed(6)}, {contextMenu.lon.toFixed(6)}
+        </div>
+      )}
     </div>
   );
 }

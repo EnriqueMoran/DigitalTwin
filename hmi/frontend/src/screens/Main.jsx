@@ -30,17 +30,63 @@ export default function MainScreen({ sensors }) {
       return {};
     }
   });
-  const [mode, setMode] = useState('Manual');
-  const [currentMission, setCurrentMission] = useState(null);
-  const [currentWpIdx, setCurrentWpIdx] = useState(0);
-  const [gpsTrail, setGpsTrail] = useState([]);
+  const [mode, setMode] = useState(() => localStorage.getItem('mode') || 'Manual');
+  const [currentMission, setCurrentMission] = useState(() => {
+    const m = localStorage.getItem('currentMission');
+    return m === '' ? null : m;
+  });
+  const [currentWpIdx, setCurrentWpIdx] = useState(() => {
+    const idx = Number(localStorage.getItem('currentWpIdx'));
+    return Number.isFinite(idx) ? idx : 0;
+    
+  });
+  const [gpsTrail, setGpsTrail] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('gpsTrail') || '[]');
+    } catch {
+      return [];
+    }
+  });
   const [selectedMission, setSelectedMission] = useState('');
-  const prevGpsPos = useRef(null);
+  const prevGpsPos = useRef(gpsTrail[gpsTrail.length - 1] || null);
 
   const setMissions = (m) => {
     setMissionsState(m);
     localStorage.setItem('missions', JSON.stringify(m));
   };
+
+  useEffect(() => {
+    localStorage.setItem('mode', mode);
+  }, [mode]);
+
+  useEffect(() => {
+    localStorage.setItem('currentMission', currentMission ?? '');
+  }, [currentMission]);
+
+  useEffect(() => {
+    localStorage.setItem('currentWpIdx', String(currentWpIdx));
+  }, [currentWpIdx]);
+
+  useEffect(() => {
+    localStorage.setItem('gpsTrail', JSON.stringify(gpsTrail));
+  }, [gpsTrail]);
+
+  useEffect(() => {
+    const uptime = sensors.uptime;
+    if (uptime == null) return;
+    const prev = Number(localStorage.getItem('serviceUptime') || '0');
+    if (uptime < prev) {
+      setMode('Manual');
+      setCurrentMission(null);
+      setCurrentWpIdx(0);
+      setGpsTrail([]);
+      localStorage.removeItem('mode');
+      localStorage.removeItem('currentMission');
+      localStorage.removeItem('currentWpIdx');
+      localStorage.removeItem('gpsTrail');
+    }
+    localStorage.setItem('serviceUptime', String(uptime));
+  }, [sensors.uptime]);
 
   useEffect(() => {
     if (mode !== 'Mission' || !currentMission) return;
