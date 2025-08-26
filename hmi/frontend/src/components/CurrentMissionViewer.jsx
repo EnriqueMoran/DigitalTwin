@@ -90,8 +90,8 @@ export default function CurrentMissionViewer({
             <tr key={idx} className={isActive && idx === currentWpIdx ? 'active' : ''}>
               <td>{idx + 1}</td>
               <td>{idx < currentWpIdx ? '✓' : ''}</td>
-              <td>{Number(wp.lat).toFixed(13)}</td>
-              <td>{Number(wp.lon).toFixed(13)}</td>
+              <td>{Number(wp.lat).toFixed(15)}</td>
+              <td>{Number(wp.lon).toFixed(15)}</td>
             </tr>
           ))}
         </tbody>

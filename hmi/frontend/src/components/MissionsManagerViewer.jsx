@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
 
 const MAX_WAYPOINTS = 10;
+const DECIMALS = 15;
 const emptyWaypoint = () => ({ lat: '', lon: '' });
+
+const formatDecimals = (value) => {
+  if (value === '') return '';
+  const num = Number(value);
+  return Number.isNaN(num) ? value : num.toFixed(DECIMALS);
+};
 
 export default function MissionsManagerViewer({ missions = {}, setMissions = () => {} }) {
   const [selected, setSelected] = useState('');
@@ -20,8 +27,8 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
       missions[selected].forEach((wp, i) => {
         if (i < MAX_WAYPOINTS) {
           wps[i] = {
-            lat: Number(wp.lat).toFixed(13),
-            lon: Number(wp.lon).toFixed(13),
+            lat: Number(wp.lat).toFixed(DECIMALS),
+            lon: Number(wp.lon).toFixed(DECIMALS),
           };
         }
       });
@@ -51,7 +58,10 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
     }
     const converted = waypoints
       .filter((wp) => wp.lat !== '' && wp.lon !== '')
-      .map((wp) => ({ lat: parseFloat(wp.lat), lon: parseFloat(wp.lon) }));
+      .map((wp) => ({
+        lat: parseFloat(formatDecimals(wp.lat)),
+        lon: parseFloat(formatDecimals(wp.lon)),
+      }));
     setMissions({ ...missions, [selected]: converted });
   };
 
@@ -59,7 +69,10 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
     if (!newName.trim()) return;
     const converted = waypoints
       .filter((wp) => wp.lat !== '' && wp.lon !== '')
-      .map((wp) => ({ lat: parseFloat(wp.lat), lon: parseFloat(wp.lon) }));
+      .map((wp) => ({
+        lat: parseFloat(formatDecimals(wp.lat)),
+        lon: parseFloat(formatDecimals(wp.lon)),
+      }));
     setMissions({ ...missions, [newName]: converted });
     setSelected(newName);
     setShowNameDialog(false);
@@ -120,11 +133,12 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
             <tr key={idx}>
               <td>{idx + 1}</td>
               <td>
-                <input
+              <input
                   type="text"
                   inputMode="decimal"
                   value={wp.lat}
                   onChange={(e) => updateWaypoint(idx, 'lat', e.target.value)}
+                  onBlur={(e) => updateWaypoint(idx, 'lat', formatDecimals(e.target.value))}
                 />
               </td>
               <td>
@@ -133,6 +147,7 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
                   inputMode="decimal"
                   value={wp.lon}
                   onChange={(e) => updateWaypoint(idx, 'lon', e.target.value)}
+                  onBlur={(e) => updateWaypoint(idx, 'lon', formatDecimals(e.target.value))}
                 />
               </td>
               <td>
