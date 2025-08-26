@@ -9,7 +9,7 @@ import SensorData from '../components/SensorData';
 import SystemStatus from '../components/SystemStatus';
 import Widgets from '../components/Widgets';
 
-const MISSION_THRESHOLD = 1; // meters
+const MISSION_THRESHOLD = 35; // meters
 
 const panelOptions = [
   { value: '3d', label: '3D Model', component: BoatViewer },

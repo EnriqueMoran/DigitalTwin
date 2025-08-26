@@ -114,7 +114,7 @@ export default function CurrentMissionViewer({
             </td>
           </tr>
           <tr>
-            <td>Remaining distance (m)</td>
+            <td>Distance (m)</td>
             <td>{remaining !== null ? remaining.toFixed(2) : 'Null'}</td>
           </tr>
         </tbody>
