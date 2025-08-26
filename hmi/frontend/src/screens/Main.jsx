@@ -9,6 +9,8 @@ import SensorData from '../components/SensorData';
 import SystemStatus from '../components/SystemStatus';
 import Widgets from '../components/Widgets';
 
+const MISSION_THRESHOLD = 1; // meters
+
 const panelOptions = [
   { value: '3d', label: '3D Model', component: BoatViewer },
   { value: 'gps', label: 'GPS', component: MapPanel },
@@ -31,7 +33,6 @@ export default function MainScreen({ sensors }) {
   const [mode, setMode] = useState('Manual');
   const [currentMission, setCurrentMission] = useState(null);
   const [currentWpIdx, setCurrentWpIdx] = useState(0);
-  const [threshold, setThreshold] = useState(1);
 
   const setMissions = (m) => {
     setMissionsState(m);
@@ -51,7 +52,7 @@ export default function MainScreen({ sensors }) {
     const lon = sensors.gps_longitude;
     if (lat === undefined || lon === undefined) return;
     const dist = haversine(lat, lon, Number(wp.lat), Number(wp.lon));
-    if (dist <= threshold) {
+    if (dist <= MISSION_THRESHOLD) {
       if (currentWpIdx + 1 >= mission.length) {
         setMode('Manual');
         setCurrentMission(null);
@@ -60,7 +61,7 @@ export default function MainScreen({ sensors }) {
         setCurrentWpIdx((i) => i + 1);
       }
     }
-  }, [sensors.gps_latitude, sensors.gps_longitude, mode, currentMission, currentWpIdx, missionsState, threshold]);
+  }, [sensors.gps_latitude, sensors.gps_longitude, mode, currentMission, currentWpIdx, missionsState]);
 
   const startMission = (name) => {
     if (!missionsState[name]) return;
@@ -90,8 +91,6 @@ export default function MainScreen({ sensors }) {
         startMission={startMission}
         cancelMission={cancelMission}
         currentWpIdx={currentWpIdx}
-        threshold={threshold}
-        setThreshold={setThreshold}
       />
     );
   };

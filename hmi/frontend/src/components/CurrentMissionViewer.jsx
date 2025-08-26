@@ -7,8 +7,6 @@ export default function CurrentMissionViewer({
   cancelMission = () => {},
   currentWpIdx = 0,
   mode = 'Manual',
-  threshold = 1,
-  setThreshold = () => {},
 }) {
   const [selected, setSelected] = useState(currentMission || '');
 
@@ -38,17 +36,8 @@ export default function CurrentMissionViewer({
           ))}
         </select>
         <button onClick={handleAction} disabled={!selected && !isActive}>
-          {isActive ? 'Cancel Mission' : 'Start Mission'}
+          {isActive ? 'Abort Mission' : 'Start Mission'}
         </button>
-        <div className="threshold">
-          <label>Threshold (m): </label>
-          <input
-            type="number"
-            step="0.1"
-            value={threshold}
-            onChange={(e) => setThreshold(parseFloat(e.target.value))}
-          />
-        </div>
       </div>
 
       <table className="mission-table">

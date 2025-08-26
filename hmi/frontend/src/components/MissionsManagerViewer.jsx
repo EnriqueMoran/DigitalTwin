@@ -121,17 +121,17 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
               <td>{idx + 1}</td>
               <td>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   value={wp.lat}
-                  step="0.0000000000001"
                   onChange={(e) => updateWaypoint(idx, 'lat', e.target.value)}
                 />
               </td>
               <td>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   value={wp.lon}
-                  step="0.0000000000001"
                   onChange={(e) => updateWaypoint(idx, 'lon', e.target.value)}
                 />
               </td>
