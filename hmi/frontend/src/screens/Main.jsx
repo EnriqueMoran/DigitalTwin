@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import BoatViewer from '../components/BoatViewer';
 import MapPanel from '../components/MapPanel';
 import RadarViewer from '../components/RadarViewer';
@@ -33,6 +33,9 @@ export default function MainScreen({ sensors }) {
   const [mode, setMode] = useState('Manual');
   const [currentMission, setCurrentMission] = useState(null);
   const [currentWpIdx, setCurrentWpIdx] = useState(0);
+  const [gpsTrail, setGpsTrail] = useState([]);
+  const [selectedMission, setSelectedMission] = useState('');
+  const prevGpsPos = useRef(null);
 
   const setMissions = (m) => {
     setMissionsState(m);
@@ -63,6 +66,28 @@ export default function MainScreen({ sensors }) {
     }
   }, [sensors.gps_latitude, sensors.gps_longitude, mode, currentMission, currentWpIdx, missionsState]);
 
+  useEffect(() => {
+    const latRaw =
+      sensors.gps_latitude ?? sensors.latitude ?? sensors.lat ?? sensors.y ?? null;
+    const lonRaw =
+      sensors.gps_longitude ??
+      sensors.longitude ??
+      sensors.lon ??
+      sensors.lng ??
+      sensors.long ??
+      null;
+    const lat = latRaw == null ? NaN : Number(latRaw);
+    const lon = lonRaw == null ? NaN : Number(lonRaw);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || (lat === 0 && lon === 0))
+      return;
+    const pos = [lat, lon];
+    const prev = prevGpsPos.current;
+    if (!prev || prev[0] !== pos[0] || prev[1] !== pos[1]) {
+      setGpsTrail((t) => [...t, pos]);
+      prevGpsPos.current = pos;
+    }
+  }, [sensors]);
+
   const startMission = (name) => {
     if (!missionsState[name]) return;
     setCurrentMission(name);
@@ -92,6 +117,9 @@ export default function MainScreen({ sensors }) {
         startMission={startMission}
         cancelMission={cancelMission}
         currentWpIdx={currentWpIdx}
+        trail={gpsTrail}
+        selectedMission={selectedMission}
+        setSelectedMission={setSelectedMission}
       />
     );
   };

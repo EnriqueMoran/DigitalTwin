@@ -145,9 +145,12 @@ body {
 
 .mission-table input {
   width: 100%;
-  background: #333;
+  background: transparent;
   color: #fff;
-  border: 1px solid #555;
+  border: none;
+  outline: none;
+  text-align: center;
+  padding: 0;
 }
 
 .mission-table tr.active {
@@ -157,6 +160,23 @@ body {
 
 .current-mission .info-table {
   margin-top: 0.5rem;
+}
+
+.mission-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #007bff;
+  color: #fff;
+  border: 2px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.mission-icon.active {
+  background: #ff5722;
 }
 
 .current-mission .info-table td {

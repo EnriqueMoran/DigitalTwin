@@ -14,6 +14,16 @@ const createBoatIcon = (angle = 0) => {
   });
 };
 
+const createMissionIcon = (num, active) => {
+  const cls = active ? 'mission-icon active' : 'mission-icon';
+  return L.divIcon({
+    html: `<div class="${cls}">${num}</div>`,
+    className: '',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+};
+
 function MapReadyListener({ onReady }) {
   const map = useMap();
   useEffect(() => {
@@ -22,7 +32,14 @@ function MapReadyListener({ onReady }) {
   return null;
 }
 
-export default function MapPanel({ sensors }) {
+export default function MapPanel({
+  sensors,
+  missions = {},
+  selectedMission = '',
+  currentMission,
+  currentWpIdx = 0,
+  trail = [],
+}) {
   const mapRef = useRef(null);
   const markerRef = useRef(null);
   const pendingCenterRef = useRef(false);
@@ -33,11 +50,12 @@ export default function MapPanel({ sensors }) {
   const followRef = useRef(true);
 
   const [follow, setFollow] = useState(true);
-  const [trail, setTrail] = useState([]);
   const [position, setPosition] = useState(null);
+  const [showMission, setShowMission] = useState(false);
 
   useEffect(() => { sensorsRef.current = sensors; }, [sensors]);
   useEffect(() => { followRef.current = follow; }, [follow]);
+  useEffect(() => setShowMission(false), [selectedMission]);
 
   const PAN_MIN_MS = 125;
 
@@ -54,14 +72,19 @@ export default function MapPanel({ sensors }) {
 
   useEffect(() => {
     if (!sensors) return;
-    const latRaw = sensors.latitude ?? sensors.lat ?? sensors.y ?? null;
-    const lonRaw = sensors.longitude ?? sensors.lon ?? sensors.lng ?? sensors.long ?? null;
+    const latRaw = sensors.latitude ?? sensors.lat ?? sensors.y ?? sensors.gps_latitude ?? null;
+    const lonRaw =
+      sensors.longitude ??
+      sensors.lon ??
+      sensors.lng ??
+      sensors.long ??
+      sensors.gps_longitude ??
+      null;
     const lat = latRaw == null ? NaN : Number(latRaw);
     const lon = lonRaw == null ? NaN : Number(lonRaw);
     if (!Number.isFinite(lat) || !Number.isFinite(lon) || (lat === 0 && lon === 0)) return;
 
     const pos = [lat, lon];
-    setTrail((prev) => [...prev, pos]);
     setPosition(pos);
 
     const map = mapRef.current;
@@ -156,21 +179,37 @@ export default function MapPanel({ sensors }) {
     handleCenter();
   };
 
+  const missionWps = selectedMission ? missions[selectedMission] || [] : [];
+  const activeIdx =
+    currentMission === selectedMission ? currentWpIdx : 0;
+
+  const missionMarkers = showMission
+    ? missionWps.map((wp, idx) => (
+        <Marker
+          key={`m${idx}`}
+          position={[Number(wp.lat), Number(wp.lon)]}
+          icon={createMissionIcon(idx + 1, idx === activeIdx)}
+        />
+      ))
+    : null;
+
   return (
     <div style={{ height: '100%', width: '100%', position: 'relative' }}>
       <MapContainer center={[0, 0]} zoom={13} style={{ height: '100%', width: '100%' }}>
         <MapReadyListener onReady={handleMapReady} />
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
         <Polyline positions={trail} pathOptions={{ color: 'yellow', dashArray: '4 4' }} />
-        {position && (
-          <Marker position={position} icon={memoIcon} ref={markerRef} />
-        )}
+        {missionMarkers}
+        {position && <Marker position={position} icon={memoIcon} ref={markerRef} />}
       </MapContainer>
 
       <div style={{ position: 'absolute', bottom: 10, left: 10, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 4 }}>
         <button onClick={handleCenter}>Center</button>
         <button onClick={handleFollow} disabled={follow}>
           {follow ? 'Following' : 'Follow'}
+        </button>
+        <button onClick={() => setShowMission((s) => !s)} disabled={!selectedMission}>
+          Mission points
         </button>
       </div>
     </div>

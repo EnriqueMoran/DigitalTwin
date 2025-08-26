@@ -1,19 +1,15 @@
-import { useEffect, useState } from 'react';
-
 export default function CurrentMissionViewer({
   sensors = {},
   missions = {},
   currentMission,
+  selectedMission = '',
+  setSelectedMission = () => {},
   startMission = () => {},
   cancelMission = () => {},
   currentWpIdx = 0,
   mode = 'Manual',
 }) {
-  const [selected, setSelected] = useState(currentMission || '');
-
-  useEffect(() => {
-    setSelected(currentMission || '');
-  }, [currentMission]);
+  const selected = selectedMission || '';
 
   const missionNames = Object.keys(missions);
   const waypoints = selected ? missions[selected] || [] : [];
@@ -69,7 +65,7 @@ export default function CurrentMissionViewer({
   return (
     <div className="current-mission">
       <div className="controls">
-        <select value={selected} onChange={(e) => setSelected(e.target.value)}>
+        <select value={selected} onChange={(e) => setSelectedMission(e.target.value)}>
           <option value="">Select mission</option>
           {missionNames.map((name) => (
             <option key={name} value={name}>
