@@ -85,6 +85,7 @@ export default function MainScreen({ sensors }) {
     return (
       <Comp
         sensors={sensorsWithMode}
+        mode={mode}
         missions={missionsState}
         setMissions={setMissions}
         currentMission={currentMission}
