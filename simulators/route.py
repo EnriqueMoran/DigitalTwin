@@ -68,6 +68,7 @@ class ScenarioRoute:
         """Return wave configuration for a given state."""
         state = state.lower()
         cfgs = {
+            "none": {"amp": 0.0, "freq": 0.0, "spike_prob": 0.0, "spike_amp": 0.0},
             "calm": {"amp": 0.5, "freq": 0.2, "spike_prob": 0.0, "spike_amp": 0.0},
             "choppy": {"amp": 10.0, "freq": 0.5, "spike_prob": 0.01, "spike_amp": 5.0},
             "moderate": {"amp": 15.0, "freq": 0.5, "spike_prob": 0.02, "spike_amp": 10.0},

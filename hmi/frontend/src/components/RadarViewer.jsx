@@ -74,7 +74,7 @@ export default function RadarViewer({ sensors }) {
           <text
             x={0}
             y={ICON_SIZE + 12}
-            fill="white"
+            fill="yellow"
             textAnchor="middle"
             fontSize="10"
           >
@@ -248,7 +248,7 @@ export default function RadarViewer({ sensors }) {
                 type="text"
                 value={
                   selectedTrack
-                    ? Number(selectedTrack.bearing).toFixed(2)
+                    ? Number(selectedTrack.bearing).toFixed(0)
                     : ''
                 }
                 readOnly
@@ -265,7 +265,7 @@ export default function RadarViewer({ sensors }) {
                 type="text"
                 value={
                   selectedTrack
-                    ? Number(selectedTrack.heading).toFixed(2)
+                    ? Number(selectedTrack.heading).toFixed(0)
                     : ''
                 }
                 readOnly

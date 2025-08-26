@@ -94,6 +94,8 @@ services:
   hmi_backend:
     build: ./hmi/backend
     container_name: hmi_backend
+    volumes:
+      - ./shared:/app/backend/shared:ro
     ports:
       - "8001:8000"
     environment:

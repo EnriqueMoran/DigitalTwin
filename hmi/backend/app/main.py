@@ -51,7 +51,7 @@ _last_processed: float = 0.0
 MQTT_HOST = os.getenv("MQTT_HOST", "mosquitto")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
-TOPICS_FILE = Path(__file__).resolve().parents[3] / "shared" / "mqtt_topics.json"
+TOPICS_FILE = Path("/app/backend/shared/mqtt_topics.json")
 with open(TOPICS_FILE) as f:
     _topics = json.load(f)["topics"]
 SENSOR_TOPICS = [t for t in _topics if t.startswith("sensor/")]
@@ -276,6 +276,7 @@ async def _broadcast_loop():
             to_remove = []
             for ws in list(WEBSOCKETS):
                 try:
+                    print(data)
                     await asyncio.wait_for(ws.send_json(data), timeout=0.1)
                 except Exception:
                     to_remove.append(ws)
