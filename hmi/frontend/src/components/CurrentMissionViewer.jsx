@@ -44,6 +44,7 @@ export default function CurrentMissionViewer({
         <thead>
           <tr>
             <th>#</th>
+            <th>✓</th>
             <th>Lat</th>
             <th>Lon</th>
           </tr>
@@ -52,6 +53,7 @@ export default function CurrentMissionViewer({
           {waypoints.map((wp, idx) => (
             <tr key={idx} className={isActive && idx === currentWpIdx ? 'active' : ''}>
               <td>{idx + 1}</td>
+              <td>{idx < currentWpIdx ? '✓' : ''}</td>
               <td>{Number(wp.lat).toFixed(13)}</td>
               <td>{Number(wp.lon).toFixed(13)}</td>
             </tr>

@@ -152,6 +152,7 @@ body {
 
 .mission-table tr.active {
   background: #333;
+  outline: 2px solid #0ff;
 }
 
 .overlay {
