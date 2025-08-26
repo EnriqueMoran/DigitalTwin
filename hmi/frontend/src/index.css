@@ -155,6 +155,14 @@ body {
   outline: 2px solid #0ff;
 }
 
+.current-mission .info-table {
+  margin-top: 0.5rem;
+}
+
+.current-mission .info-table td {
+  padding: 0.25rem;
+}
+
 .overlay {
   position: absolute;
   top: 0;
