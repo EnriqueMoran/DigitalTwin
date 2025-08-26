@@ -195,7 +195,7 @@ export default function MapPanel({
 
   const handleCopyCoords = () => {
     if (!contextMenu) return;
-    const text = `${contextMenu.lat.toFixed(6)}, ${contextMenu.lon.toFixed(6)}`;
+    const text = `${contextMenu.lat.toFixed(15)}, ${contextMenu.lon.toFixed(15)}`;
     navigator.clipboard?.writeText(text);
     setContextMenu(null);
   };
