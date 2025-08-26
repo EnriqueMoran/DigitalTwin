@@ -126,6 +126,11 @@ body {
   margin-bottom: 0.5rem;
 }
 
+.mission-manager .controls select,
+.current-mission .controls select {
+  width: 180px;
+}
+
 .mission-table {
   width: 100%;
   border-collapse: collapse;

@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react';
 
+const MAX_WAYPOINTS = 10;
+const emptyWaypoint = () => ({ lat: '', lon: '' });
+
 export default function MissionsManagerViewer({ missions = {}, setMissions = () => {} }) {
   const [selected, setSelected] = useState('');
-  const [waypoints, setWaypoints] = useState([]);
+  const [waypoints, setWaypoints] = useState(
+    Array.from({ length: MAX_WAYPOINTS }, emptyWaypoint)
+  );
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [newName, setNewName] = useState('');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -11,24 +16,31 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
 
   useEffect(() => {
     if (selected && missions[selected]) {
-      setWaypoints(
-        missions[selected].map((wp) => ({
-          lat: Number(wp.lat).toFixed(13),
-          lon: Number(wp.lon).toFixed(13),
-        }))
-      );
+      const wps = Array.from({ length: MAX_WAYPOINTS }, emptyWaypoint);
+      missions[selected].forEach((wp, i) => {
+        if (i < MAX_WAYPOINTS) {
+          wps[i] = {
+            lat: Number(wp.lat).toFixed(13),
+            lon: Number(wp.lon).toFixed(13),
+          };
+        }
+      });
+      setWaypoints(wps);
     } else {
-      setWaypoints([]);
+      setWaypoints(Array.from({ length: MAX_WAYPOINTS }, emptyWaypoint));
     }
   }, [selected, missions]);
 
   const updateWaypoint = (idx, field, value) => {
-    const updated = waypoints.map((wp, i) => (i === idx ? { ...wp, [field]: value } : wp));
+    const updated = [...waypoints];
+    updated[idx] = { ...updated[idx], [field]: value };
     setWaypoints(updated);
   };
 
-  const addWaypoint = () => {
-    setWaypoints([...waypoints, { lat: '0.0000000000000', lon: '0.0000000000000' }]);
+  const clearWaypoint = (idx) => {
+    const updated = [...waypoints];
+    updated[idx] = emptyWaypoint();
+    setWaypoints(updated);
   };
 
   const saveMission = () => {
@@ -37,13 +49,17 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
       setShowNameDialog(true);
       return;
     }
-    const converted = waypoints.map((wp) => ({ lat: parseFloat(wp.lat), lon: parseFloat(wp.lon) }));
+    const converted = waypoints
+      .filter((wp) => wp.lat !== '' && wp.lon !== '')
+      .map((wp) => ({ lat: parseFloat(wp.lat), lon: parseFloat(wp.lon) }));
     setMissions({ ...missions, [selected]: converted });
   };
 
   const confirmNewMission = () => {
     if (!newName.trim()) return;
-    const converted = waypoints.map((wp) => ({ lat: parseFloat(wp.lat), lon: parseFloat(wp.lon) }));
+    const converted = waypoints
+      .filter((wp) => wp.lat !== '' && wp.lon !== '')
+      .map((wp) => ({ lat: parseFloat(wp.lat), lon: parseFloat(wp.lon) }));
     setMissions({ ...missions, [newName]: converted });
     setSelected(newName);
     setShowNameDialog(false);
@@ -77,7 +93,9 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
         <button
           onClick={() => {
             setSelected('');
-            setWaypoints([]);
+            setWaypoints(
+              Array.from({ length: MAX_WAYPOINTS }, emptyWaypoint)
+            );
           }}
         >
           New Mission
@@ -118,16 +136,12 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
                 />
               </td>
               <td>
-                <button onClick={() => setWaypoints(waypoints.filter((_, i) => i !== idx))}>🗑️</button>
+                <button onClick={() => clearWaypoint(idx)}>🗑️</button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-      <div>
-        <button onClick={addWaypoint}>Add Waypoint</button>
-      </div>
-
       {showNameDialog && (
         <div className="overlay">
           <div className="dialog">
