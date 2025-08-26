@@ -28,9 +28,7 @@ export default function CurrentMissionViewer({
 
   const fmtLatLon = (v) => {
     if (v === undefined || v === null) return 'Null';
-    const dec = Number(v).toFixed(12);
-    const extraSpace = v >= 0 ? ' ' : '';
-    return `${toDMS(Number(v))}${extraSpace} (${dec})`;
+    return toDMS(Number(v));
   };
 
   const haversine = (lat1, lon1, lat2, lon2) => {
