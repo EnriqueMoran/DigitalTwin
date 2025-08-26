@@ -50,10 +50,19 @@ export default function MainScreen({ sensors }) {
       setCurrentMission(null);
       return;
     }
+    const latRaw =
+      sensors.gps_latitude ?? sensors.latitude ?? sensors.lat ?? sensors.y ?? null;
+    const lonRaw =
+      sensors.gps_longitude ??
+      sensors.longitude ??
+      sensors.lon ??
+      sensors.lng ??
+      sensors.long ??
+      null;
+    const lat = latRaw == null ? NaN : Number(latRaw);
+    const lon = lonRaw == null ? NaN : Number(lonRaw);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
     const wp = mission[currentWpIdx];
-    const lat = sensors.gps_latitude;
-    const lon = sensors.gps_longitude;
-    if (lat === undefined || lon === undefined) return;
     const dist = haversine(lat, lon, Number(wp.lat), Number(wp.lon));
     if (dist <= MISSION_THRESHOLD) {
       if (currentWpIdx + 1 >= mission.length) {
@@ -64,7 +73,7 @@ export default function MainScreen({ sensors }) {
         setCurrentWpIdx((i) => i + 1);
       }
     }
-  }, [sensors.gps_latitude, sensors.gps_longitude, mode, currentMission, currentWpIdx, missionsState]);
+  }, [sensors, mode, currentMission, currentWpIdx, missionsState]);
 
   useEffect(() => {
     const latRaw =

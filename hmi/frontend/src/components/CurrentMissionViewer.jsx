@@ -45,14 +45,20 @@ export default function CurrentMissionViewer({
   };
 
   const target = waypoints[currentWpIdx];
+  const latRaw =
+    sensors.gps_latitude ?? sensors.latitude ?? sensors.lat ?? sensors.y ?? null;
+  const lonRaw =
+    sensors.gps_longitude ??
+    sensors.longitude ??
+    sensors.lon ??
+    sensors.lng ??
+    sensors.long ??
+    null;
+  const lat = latRaw == null ? NaN : Number(latRaw);
+  const lon = lonRaw == null ? NaN : Number(lonRaw);
   const remaining =
-    target && sensors.gps_latitude !== undefined && sensors.gps_longitude !== undefined
-      ? haversine(
-          sensors.gps_latitude,
-          sensors.gps_longitude,
-          Number(target.lat),
-          Number(target.lon)
-        )
+    target && Number.isFinite(lat) && Number.isFinite(lon)
+      ? haversine(lat, lon, Number(target.lat), Number(target.lon))
       : null;
 
   const handleAction = () => {
