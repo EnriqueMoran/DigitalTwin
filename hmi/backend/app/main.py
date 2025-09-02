@@ -46,6 +46,8 @@ WEBSOCKETS: Set[WebSocket] = set()
 MQTT_CLIENT: mqtt.Client | None = None
 EVENT_LOOP: asyncio.AbstractEventLoop | None = None
 _last_broadcast: float = 0.0
+# Service start time (monotonic) to compute uptime
+_service_start_monotonic: float = time.monotonic()
 _last_processed: float = 0.0
 
 MQTT_HOST = os.getenv("MQTT_HOST", "mosquitto")
@@ -272,16 +274,29 @@ async def _broadcast_loop():
         now = time.monotonic()
         if now - _last_broadcast >= 0.1:
             _last_broadcast = now
+            # Update service uptime based on monotonic clock
+            try:
+                STATE["uptime"] = int(max(0, time.monotonic() - _service_start_monotonic))
+            except Exception:
+                # Fallback in case of unexpected errors
+                STATE["uptime"] = int(now)
+
+            # Snapshot data to send
             data = {"sensors": STATE, "last_message_time": LAST_MESSAGE_TIME}
-            to_remove = []
-            for ws in list(WEBSOCKETS):
-                try:
-                    print(data)
-                    await asyncio.wait_for(ws.send_json(data), timeout=0.1)
-                except Exception:
-                    to_remove.append(ws)
-            for ws in to_remove:
-                WEBSOCKETS.discard(ws)
+
+            # Send concurrently to avoid one slow client blocking others
+            sockets = list(WEBSOCKETS)
+            if sockets:
+                results = await asyncio.gather(
+                    *(ws.send_json(data) for ws in sockets),
+                    return_exceptions=True,
+                )
+                for ws, res in zip(sockets, results):
+                    if isinstance(res, Exception):
+                        try:
+                            WEBSOCKETS.discard(ws)
+                        except Exception:
+                            pass
         await asyncio.sleep(0.01)
 
 
