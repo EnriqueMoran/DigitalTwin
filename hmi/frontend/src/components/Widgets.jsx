@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-function Compass({ heading = 0 }) {
+function Compass({ heading = 0, cog = null }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -37,7 +37,19 @@ function Compass({ heading = 0 }) {
     ctx.lineTo(0, -size / 2 + 15);
     ctx.stroke();
     ctx.restore();
-  }, [heading]);
+
+    if (cog !== null && cog !== undefined) {
+      ctx.save();
+      ctx.translate(size / 2, size / 2);
+      ctx.rotate(cog);
+      ctx.strokeStyle = 'orange';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -size / 2 + 15);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }, [heading, cog]);
 
   return <canvas ref={canvasRef} width={150} height={150} className="widget-canvas" />;
 }
@@ -90,7 +102,7 @@ function AttitudeIndicator({ roll = 0, pitch = 0 }) {
   return <canvas ref={canvasRef} width={150} height={150} className="widget-canvas" />;
 }
 
-function Speedometer({ est = 0, real = 0, max = 20 }) {
+function Speedometer({ value = 0, max = 20 }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -127,19 +139,14 @@ function Speedometer({ est = 0, real = 0, max = 20 }) {
       ctx.fillText(String(value), (radius - 25) * Math.cos(angle), (radius - 25) * Math.sin(angle));
     }
 
-    const needle = (value, color) => {
-      const angle = start - (value / max) * total;
-      ctx.strokeStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo((radius - 15) * Math.cos(angle), (radius - 15) * Math.sin(angle));
-      ctx.stroke();
-    };
-
-    needle(est, 'orange');
-    needle(real, 'lime');
+    const angle = start - (value / max) * total;
+    ctx.strokeStyle = 'lime';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo((radius - 15) * Math.cos(angle), (radius - 15) * Math.sin(angle));
+    ctx.stroke();
     ctx.restore();
-  }, [est, real, max]);
+  }, [value, max]);
 
   return <canvas ref={canvasRef} width={150} height={150} className="widget-canvas" />;
 }
@@ -152,8 +159,16 @@ export default function Widgets({ sensors = {} }) {
       <div className="widgets">
         <div className="widget">
           <h4>Heading</h4>
-          <Compass heading={sensors.heading} />
-          <div className="value">{((toDeg(sensors.heading ?? 0) + 360) % 360).toFixed(0)}°</div>
+          <Compass heading={sensors.heading} cog={sensors.cog} />
+          <div className="value">
+            <span><span className="legend-color heading"></span>Heading: {((toDeg(sensors.heading ?? 0) + 360) % 360).toFixed(0)}°</span>
+            <br />
+            <span><span className="legend-color cog"></span>COG: {((toDeg(sensors.cog ?? 0) + 360) % 360).toFixed(0)}°</span>
+          </div>
+          <div className="legend">
+            <span><span className="legend-color heading"></span>Heading</span>
+            <span><span className="legend-color cog"></span>COG</span>
+          </div>
         </div>
         <div className="widget">
           <h4>Attitude</h4>
@@ -165,15 +180,8 @@ export default function Widgets({ sensors = {} }) {
         </div>
         <div className="widget">
           <h4>Speed</h4>
-          <Speedometer est={sensors.estimated_speed} real={sensors.true_speed} />
-          <div className="value">
-            Est: {(sensors.estimated_speed ?? 0).toFixed(2)} m/s<br />
-            Real: {(sensors.true_speed ?? 0).toFixed(2)} m/s
-          </div>
-          <div className="legend">
-            <span><span className="legend-color est"></span>Estimated</span>
-            <span><span className="legend-color real"></span>Real</span>
-          </div>
+          <Speedometer value={sensors.true_speed} />
+          <div className="value">{(sensors.true_speed ?? 0).toFixed(2)} m/s</div>
         </div>
       </div>
     </div>

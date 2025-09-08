@@ -32,11 +32,10 @@ export default function SensorData({ sensors = {} }) {
     ['Longitude', fmtLatLon(sensors.longitude)],
     ['Altitude (m)', fmt(sensors.altitude, '', toFixed(2))],
     ['Heading (deg)', fmt(sensors.heading, '', toDeg)],
+    ['COG (deg)', fmt(sensors.cog, '', toDeg)],
     ['Roll (deg)', fmt(sensors.roll, '', toDeg)],
     ['Pitch (deg)', fmt(sensors.pitch, '', toDeg)],
-    ['Estimated speed (m/s)', fmt(sensors.estimated_speed, '', toFixed(3))],
-    ['True speed (m/s)', fmt(sensors.true_speed, '', toFixed(3))],
-    ['Rate of turn (deg/s)', fmt(sensors.rate_of_turn, '', toDeg)],
+    ['SOG (m/s)', fmt(sensors.true_speed, '', toFixed(3))],
   ];
   return (
     <div>

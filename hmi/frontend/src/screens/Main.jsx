@@ -18,11 +18,17 @@ const panelOptions = [
   { value: 'currentMission', label: 'Current Mission', component: CurrentMissionViewer },
   { value: 'missionsManager', label: 'Missions Manager', component: MissionsManagerViewer },
   { value: 'cameras', label: 'Onboard Cameras', component: CamerasViewer },
+  { value: 'sensorData', label: 'Sensor Data', component: SensorData },
+  { value: 'systemStatus', label: 'System Status', component: SystemStatus },
+  { value: 'widgets', label: 'Widgets', component: Widgets },
 ];
 
 export default function MainScreen({ sensors }) {
   const [leftPanel, setLeftPanel] = useState('3d');
   const [rightPanel, setRightPanel] = useState('gps');
+  const [bottomLeftPanel, setBottomLeftPanel] = useState('sensorData');
+  const [bottomCenterPanel, setBottomCenterPanel] = useState('systemStatus');
+  const [bottomRightPanel, setBottomRightPanel] = useState('widgets');
   const [missionsState, setMissionsState] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('missions') || '{}');
@@ -204,9 +210,36 @@ export default function MainScreen({ sensors }) {
         </div>
       </div>
       <div className="bottom-panels">
-        <SensorData sensors={sensorsWithMode} />
-        <SystemStatus sensors={sensorsWithMode} />
-        <Widgets sensors={sensorsWithMode} />
+        <div className="panel-container">
+          <select value={bottomLeftPanel} onChange={(e) => setBottomLeftPanel(e.target.value)}>
+            {panelOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <div className="panel">{renderPanel(bottomLeftPanel)}</div>
+        </div>
+        <div className="panel-container">
+          <select value={bottomCenterPanel} onChange={(e) => setBottomCenterPanel(e.target.value)}>
+            {panelOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <div className="panel">{renderPanel(bottomCenterPanel)}</div>
+        </div>
+        <div className="panel-container">
+          <select value={bottomRightPanel} onChange={(e) => setBottomRightPanel(e.target.value)}>
+            {panelOptions.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <div className="panel">{renderPanel(bottomRightPanel)}</div>
+        </div>
       </div>
     </div>
   );

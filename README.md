@@ -50,6 +50,20 @@ Run a single service:
 docker compose up --build imu_sim
 ```
 
+## MQTT Topics
+
+| Topic | Emisor | Receptor | Contenido |
+|-------|--------|----------|-----------|
+| `sim/imu` | Simulador | ESP32 | Simulated IMU values |
+| `sim/gps` | Simulador | ESP32 | Simulated GPS location |
+| `sim/battery` | Simulador | ESP32 | Simulated Battery condition |
+| `sensor/imu` | ESP32 | Estación | Re published IMU values from ESP32 |
+| `sensor/gps` | ESP32 | Estación | Re published GPS location from ESP32 |
+| `sensor/battery` | ESP32 | Estación | Re published Battery condition from ESP32 |
+| `sensor/track` | Radar | Estación | Radar track detections |
+| `sensor/radar` | Radar | Estación | Radar track list |
+| `processed/radar` | Estación | Clientes | Processed radar tracks |
+
 ## Future plans
 
 - Integrate onboard cameras for obstacle detection

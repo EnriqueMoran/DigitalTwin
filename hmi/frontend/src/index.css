@@ -26,6 +26,9 @@ body {
 }
 .dot.green { background: #0f0; }
 .dot.red { background: #f00; }
+.dot.orange { background: orange; }
+.dot.lightgreen { background: #9f9; }
+.dot.yellow { background: #ff0; }
 .last-message {
   margin-left: 0.5rem;
 }
@@ -62,11 +65,9 @@ body {
   position: relative;
   overflow: hidden;
 }
-.bottom-panels > * {
-  flex: 1;
-  border: 1px solid #444;
+
+.bottom-panels .panel {
   padding: 0.5rem;
-  background: #1e1e1e;
   overflow: auto;
 }
 
@@ -114,8 +115,8 @@ body {
   margin-right: 0.25rem;
 }
 
-.legend-color.est { background: orange; }
-.legend-color.real { background: lime; }
+.legend-color.heading { background: red; }
+.legend-color.cog { background: orange; }
 
 /* Missions panels */
 .mission-manager .controls,
