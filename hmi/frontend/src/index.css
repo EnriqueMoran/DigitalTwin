@@ -68,7 +68,7 @@ body {
 
 .bottom-panels .panel {
   padding: 0.5rem;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .placeholder {
@@ -108,6 +108,8 @@ body {
   font-size: 0.8rem;
 }
 
+/* Legend appears under Heading widget; no absolute positioning */
+
 .legend-color {
   display: inline-block;
   width: 10px;
@@ -119,6 +121,12 @@ body {
 .legend-color.cog { background: orange; }
 
 /* Missions panels */
+.mission-manager,
+.current-mission {
+  /* Allow inner scroll independent from outer panel */
+  height: 100%;
+  overflow: auto;
+}
 .mission-manager .controls,
 .current-mission .controls {
   display: flex;
@@ -218,4 +226,76 @@ body {
   display: flex;
   gap: 0.5rem;
   justify-content: flex-end;
+}
+
+/* System Status layout */
+.system-status {
+  height: 100%;
+}
+
+.system-status h3 {
+  margin: 0.25rem 0 0.75rem 0;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 1rem;
+  row-gap: 1.25rem; /* a bit more vertical spacing */
+}
+
+/* Vertical separator between grid columns */
+.status-grid > .status-section:nth-child(2n) {
+  border-left: 1px solid #444;
+  padding-left: 1rem;
+}
+
+.status-section h4 {
+  margin: 0 0 0.25rem 0;
+}
+
+/* When using column wrappers (legacy), keep spacing. Safe no-op now. */
+.status-col .status-section + .status-section { margin-top: 1rem; }
+
+/* Widgets: lift gauges slightly but keep legend position */
+.widget h4 {
+  margin: 0 0 0.25rem 0;
+}
+
+.widget-canvas {
+  display: block; /* ensure values render below canvas */
+  margin: -6px auto 0; /* center canvas and lift a bit */
+}
+
+.system-status table {
+  /* Keep values close to labels */
+  width: auto;
+  display: inline-table;
+  border-collapse: collapse;
+}
+
+.system-status td {
+  padding: 0.125rem 0.25rem;
+}
+
+.system-status td:first-child {
+  color: #bbb;
+  padding-right: 0.25rem; /* tighter gap between label and value */
+}
+
+/* Key-value alignment for Heading/COG under Widgets */
+.value-kv {
+  display: grid; /* block-level grid under the canvas */
+  grid-template-columns: auto auto;
+  column-gap: 0.5rem;
+  row-gap: 0.125rem;
+  width: max-content; /* shrink to content */
+  margin: 0.25rem auto 0; /* center under widget */
+}
+.kv-key { text-align: left; }
+.kv-value { text-align: right; }
+
+/* Align all panel titles with System Status */
+.panel h3 {
+  margin: 0.25rem 0 0.75rem 0;
 }

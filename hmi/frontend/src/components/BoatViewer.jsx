@@ -49,7 +49,7 @@ export default function BoatViewer({ sensors }) {
         const maxDim = Math.max(size.x, size.y, size.z);
         const fov = (camera.fov * Math.PI) / 180;
         let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
-        cameraZ *= 1.5;
+        cameraZ *= 1;
         camera.position.set(center.x, center.y, cameraZ);
         controls.target.copy(center);
         controls.update();

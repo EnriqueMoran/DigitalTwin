@@ -160,22 +160,21 @@ export default function Widgets({ sensors = {} }) {
         <div className="widget">
           <h4>Heading</h4>
           <Compass heading={sensors.heading} cog={sensors.cog} />
-          <div className="value">
-            <span><span className="legend-color heading"></span>Heading: {((toDeg(sensors.heading ?? 0) + 360) % 360).toFixed(0)}°</span>
-            <br />
-            <span><span className="legend-color cog"></span>COG: {((toDeg(sensors.cog ?? 0) + 360) % 360).toFixed(0)}°</span>
-          </div>
-          <div className="legend">
-            <span><span className="legend-color heading"></span>Heading</span>
-            <span><span className="legend-color cog"></span>COG</span>
+          <div className="value value-kv">
+            <span className="kv-key"><span className="legend-color heading"></span>HDG:</span>
+            <span className="kv-value">{((toDeg(sensors.heading ?? 0) + 360) % 360).toFixed(0)}°</span>
+            <span className="kv-key"><span className="legend-color cog"></span>COG:</span>
+            <span className="kv-value">{((toDeg(sensors.cog ?? 0) + 360) % 360).toFixed(0)}°</span>
           </div>
         </div>
         <div className="widget">
           <h4>Attitude</h4>
           <AttitudeIndicator roll={sensors.roll} pitch={sensors.pitch} />
-          <div className="value">
-            Roll: {toDeg(sensors.roll ?? 0).toFixed(2)}°<br />
-            Pitch: {toDeg(sensors.pitch ?? 0).toFixed(2)}°
+          <div className="value value-kv">
+            <span className="kv-key">Roll:</span>
+            <span className="kv-value">{toDeg(sensors.roll ?? 0).toFixed(2)}°</span>
+            <span className="kv-key">Pitch:</span>
+            <span className="kv-value">{toDeg(sensors.pitch ?? 0).toFixed(2)}°</span>
           </div>
         </div>
         <div className="widget">

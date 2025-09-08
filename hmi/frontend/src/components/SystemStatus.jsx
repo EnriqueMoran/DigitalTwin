@@ -108,22 +108,35 @@ export default function SystemStatus({ sensors = {} }) {
     return 'Invalid';
   })();
 
-  const sections = {
-    General: [
+  const general = {
+    title: 'General',
+    rows: [
       ['Connection State', connectionDisplay],
       ['Mode', fmt(sensors.mode)],
       ['Latency (s)', fmt(sensors.latency, '', toFixed(3))],
       ['Uptime (HH:MM:SS)', fmt(sensors.uptime, '', formatHHMMSS)],
     ],
-    Battery: [
-      ['Main battery (%)', 'Unavailable'],
-      ['Engine battery (%)', 'Unavailable'],
-    ],
-    Sensors: [
+  };
+
+  const sensorsSection = {
+    title: 'Sensors',
+    rows: [
       ['IMU', fmt(sensors.imu_state)],
       ['GPS', fmt(sensors.gps_state)],
     ],
-    GPS: [
+  };
+
+  const battery = {
+    title: 'Battery',
+    rows: [
+      ['Main battery (%)', 'Unavailable'],
+      ['Engine battery (%)', 'Unavailable'],
+    ],
+  };
+
+  const gps = {
+    title: 'GPS',
+    rows: [
       ['Estimated Quality (%)', fmt(quality, '%')],
       ['Fix', fixText],
       [
@@ -136,24 +149,33 @@ export default function SystemStatus({ sensors = {} }) {
     ],
   };
 
+  const Section = ({ title, rows }) => (
+    <div className="status-section">
+      <h4>{title}</h4>
+      <table>
+        <tbody>
+          {rows.map(([label, value]) => (
+            <tr key={label}>
+              <td>{label}</td>
+              <td>{value}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
   return (
-    <div>
+    <div className="system-status">
       <h3>System Status</h3>
-      {Object.entries(sections).map(([title, rows]) => (
-        <div key={title}>
-          <h4>{title}</h4>
-          <table>
-            <tbody>
-              {rows.map(([label, value]) => (
-                <tr key={label}>
-                  <td>{label}</td>
-                  <td>{value}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
+      <div className="status-grid">
+        {/* Row 1: left General, right Battery */}
+        <Section title={general.title} rows={general.rows} />
+        <Section title={battery.title} rows={battery.rows} />
+        {/* Row 2: left Sensors, right GPS (aligned by grid rows) */}
+        <Section title={sensorsSection.title} rows={sensorsSection.rows} />
+        <Section title={gps.title} rows={gps.rows} />
+      </div>
     </div>
   );
 }

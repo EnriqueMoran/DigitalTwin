@@ -192,7 +192,7 @@ void handleGPS(){
     }
   }
 
-  // If fixed rate is requested, publish on schedule using last cache
+  // If fixed-rate publishing is enabled, publish on schedule using last cache
   if(GPS_PERIOD_MS>0){
     uint32_t now = millis();
     if(now - lastGpsSendMs >= GPS_PERIOD_MS){
