@@ -12,7 +12,6 @@ from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 
 from simulators.imu_sim.lib.imu_sim import MPU9250
-from simulators.route import ScenarioRoute
 
 LOG = logging.getLogger("imu_sim.bridge")
 
@@ -47,15 +46,11 @@ class IMUPublisher:
         self.log_messages: bool = False
 
         self._load_mqtt_config()
-
-        # Load navigation scenario defining motion and sea state
-        scen_path = Path(__file__).resolve().parents[2] / "scenarios" / "main_scenario.json"
-        try:
-            self.route = ScenarioRoute(scen_path)
-            LOG.info("Loaded scenario from %s", scen_path)
-        except Exception as e:
-            LOG.error("Failed to load scenario %s: %s", scen_path, e)
-            raise
+        self.control_topic = "land/imu"
+        self.wave_cfg = {"amp": 0.0, "freq": 0.0, "spike_prob": 0.0, "spike_amp": 0.0}
+        self.heading = 0.0
+        self._active = False
+        self._sim_start = 0.0
 
     def _load_mqtt_config(self) -> None:
         import configparser
@@ -167,6 +162,7 @@ class IMUPublisher:
 
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
+        self.client.on_message = self._on_message
 
     def _on_connect(self, client, userdata, flags, rc):
         if rc == 0:
@@ -176,11 +172,88 @@ class IMUPublisher:
                     client.publish(self.status_topic, json.dumps({"status": "online", "ts": now_iso()}), qos=1, retain=True)
                 except Exception:
                     LOG.debug("Failed to publish online status")
+            try:
+                client.subscribe(self.control_topic)
+            except Exception:
+                LOG.debug("Failed to subscribe to %s", self.control_topic)
         else:
             LOG.error("MQTT connect failed with rc=%s", rc)
 
     def _on_disconnect(self, client, userdata, rc):
         LOG.warning("Disconnected from broker (rc=%s)", rc)
+
+    def _on_message(self, client, userdata, msg):
+        if msg.topic != self.control_topic:
+            return
+        try:
+            data = json.loads(msg.payload.decode())
+        except Exception:
+            return
+        ctrl = str(data.get("control", "")).upper()
+        if ctrl == "START":
+            self.wave_cfg = {
+                "amp": float(data.get("amp", 0.0)),
+                "freq": float(data.get("freq", 0.0)),
+                "spike_prob": float(data.get("spike_prob", 0.0)),
+                "spike_amp": float(data.get("spike_amp", 0.0)),
+            }
+            h = float(data.get("heading", 0.0))
+            self.heading = h if h >= 0 else 0.0
+            self._active = True
+            self._sim_start = time.time()
+            now = time.time()
+            self._t_next_acc = now
+            self._t_next_gyro = now
+            self._t_next_mag = now
+        elif ctrl == "STOP":
+            self._active = False
+
+    def _motion(self, t: float):
+        amp = float(self.wave_cfg.get("amp", 0.0))
+        freq = float(self.wave_cfg.get("freq", 0.0))
+        spike_prob = float(self.wave_cfg.get("spike_prob", 0.0))
+        spike_amp = float(self.wave_cfg.get("spike_amp", 0.0))
+
+        if spike_prob > 0.0 and np.random.random() < spike_prob:
+            sign = 1.0 if np.random.random() < 0.5 else -1.0
+            roll_spike = sign * spike_amp
+            pitch_spike = sign * (0.6 * spike_amp)
+            yaw_spike = sign * (0.3 * spike_amp)
+        else:
+            roll_spike = pitch_spike = yaw_spike = 0.0
+
+        roll_deg = amp * np.sin(2.0 * np.pi * freq * t) + roll_spike
+        pitch_deg = (amp / 2.0) * np.sin(2.0 * np.pi * freq * t + np.pi / 2.0) + pitch_spike
+
+        if self.heading <= 0 and self.heading != 0:
+            yaw_wave_amp_deg = 0.0
+            base_heading_deg = 0.0
+        else:
+            base_heading_deg = float(self.heading)
+            yaw_wave_amp_deg = max(0.2, amp * 0.03)
+        yaw_wave = yaw_wave_amp_deg * np.sin(2.0 * np.pi * freq * t + np.pi / 3.0)
+        yaw_deg = base_heading_deg + yaw_wave + yaw_spike
+
+        roll_rad = np.radians(roll_deg)
+        pitch_rad = np.radians(pitch_deg)
+        yaw_rad = np.radians(yaw_deg)
+
+        cr, sr = np.cos(roll_rad), np.sin(roll_rad)
+        cp, sp = np.cos(pitch_rad), np.sin(pitch_rad)
+        cy, sy = np.cos(yaw_rad), np.sin(yaw_rad)
+        R = np.array([
+            [cy * cp, cy * sp * sr - sy * cr, cy * sp * cr + sy * sr],
+            [sy * cp, sy * sp * sr + cy * cr, sy * sp * cr - cy * sr],
+            [-sp, cp * sr, cp * cr],
+        ], dtype=float)
+
+        roll_rate = amp * 2.0 * np.pi * freq * np.cos(2.0 * np.pi * freq * t)
+        pitch_rate = (amp / 2.0) * 2.0 * np.pi * freq * np.cos(2.0 * np.pi * freq * t + np.pi / 2.0)
+        yaw_rate = yaw_wave_amp_deg * 2.0 * np.pi * freq * np.cos(2.0 * np.pi * freq * t + np.pi / 3.0)
+        omega = np.array([roll_rate, pitch_rate, yaw_rate], dtype=float)
+
+        a_lin = np.zeros(3, dtype=float)
+        return a_lin, omega, R
 
     def start(self) -> None:
         # Start publishing loop (blocks until stop()).
@@ -202,14 +275,14 @@ class IMUPublisher:
             LOG.debug("Failed to publish online status on start")
 
         # Compute sample intervals from configured ODRs
-        dt_acc = 1.0 / float(self.imu.accel_odr_hz)
-        dt_gyro = 1.0 / float(self.imu.gyro_odr_hz)
-        dt_mag = 1.0 / float(self.imu.mag_odr_hz)
+        self._dt_acc = 1.0 / float(self.imu.accel_odr_hz)
+        self._dt_gyro = 1.0 / float(self.imu.gyro_odr_hz)
+        self._dt_mag = 1.0 / float(self.imu.mag_odr_hz)
 
         # Next-sample timestamps
-        t_next_acc = time.time()
-        t_next_gyro = time.time()
-        t_next_mag = time.time()
+        self._t_next_acc = time.time()
+        self._t_next_gyro = time.time()
+        self._t_next_mag = time.time()
 
         # Last sampled values
         last_acc = [0.0, 0.0, 0.0]
@@ -220,8 +293,6 @@ class IMUPublisher:
         last_acc_ts = 0.0
         last_gyro_ts = 0.0
         last_mag_ts = 0.0
-
-        sim_start = time.time()
 
         self._running = True
         LOG.info(
@@ -235,36 +306,39 @@ class IMUPublisher:
 
         try:
             while self._running:
+                if not self._active:
+                    time.sleep(0.1)
+                    continue
                 now_t = time.time()
-                sim_t = now_t - sim_start
+                sim_t = now_t - self._sim_start
                 sampled = False
 
                 # Compute motion only when a sensor needs sampling
-                if now_t >= t_next_acc or now_t >= t_next_gyro or now_t >= t_next_mag:
-                    a_lin, omega, R = self.route.imu_motion(sim_t)
+                if now_t >= self._t_next_acc or now_t >= self._t_next_gyro or now_t >= self._t_next_mag:
+                    a_lin, omega, R = self._motion(sim_t)
 
                 # Sample accelerometer when scheduled
-                if now_t >= t_next_acc:
+                if now_t >= self._t_next_acc:
                     _, a_g = self.imu.sample_accel(a_lin, R)
                     last_acc = [float(a_g[0]), float(a_g[1]), float(a_g[2])]
                     last_acc_ts = now_t
-                    t_next_acc += dt_acc
+                    self._t_next_acc += self._dt_acc
                     sampled = True
 
                 # Sample gyroscope when scheduled
-                if now_t >= t_next_gyro:
+                if now_t >= self._t_next_gyro:
                     _, w = self.imu.sample_gyro(omega, R)
                     last_gyro = [float(w[0]), float(w[1]), float(w[2])]
                     last_gyro_ts = now_t
-                    t_next_gyro += dt_gyro
+                    self._t_next_gyro += self._dt_gyro
                     sampled = True
 
                 # Sample magnetometer when scheduled
-                if now_t >= t_next_mag:
+                if now_t >= self._t_next_mag:
                     _, m = self.imu.sample_mag(R)
                     last_mag = [float(m[0]), float(m[1]), float(m[2])]
                     last_mag_ts = now_t
-                    t_next_mag += dt_mag
+                    self._t_next_mag += self._dt_mag
                     sampled = True
 
                 # Publish only if at least one sensor sampled now
@@ -309,7 +383,7 @@ class IMUPublisher:
                         LOG.warning("Failed to publish: %s", e)
 
                 # Sleep until the next scheduled sample to avoid busy loop
-                next_events = [t_next_acc, t_next_gyro, t_next_mag]
+                next_events = [self._t_next_acc, self._t_next_gyro, self._t_next_mag]
                 sleep_until = min(next_events) - time.time()
                 if sleep_until > 0:
                     time.sleep(min(max(sleep_until, 0.001), 0.1))

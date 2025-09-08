@@ -1,20 +1,22 @@
 import json
 import logging
+import math
 import time
 
 import paho.mqtt.client as mqtt
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 
 from jsonschema import Draft7Validator
 from jsonschema.exceptions import ValidationError
 
 from simulators.gps_sim.lib.gps_sim import NEOM8N
-from simulators.route import ScenarioRoute
 
 LOG = logging.getLogger("gps_sim.bridge")
+
+MS_TO_KNOTS = 1.0 / 0.514444
 
 
 def now_iso() -> str:
@@ -44,15 +46,17 @@ class GPSPublisher:
         self.log_messages: bool = False
 
         self._load_mqtt_config()
-
-        # Load navigation scenario defining route and wave state
-        scen_path = Path(__file__).resolve().parents[2] / "scenarios" / "main_scenario.json"
-        try:
-            self.route = ScenarioRoute(scen_path)
-            LOG.info("Loaded scenario from %s", scen_path)
-        except Exception as e:
-            LOG.error("Failed to load scenario %s: %s", scen_path, e)
-            raise
+        self.control_topic = "land/gps"
+        self._active = False
+        self.mode: Optional[str] = None
+        self.lat = 0.0
+        self.lon = 0.0
+        self.hdg = 0.0
+        self.spd = 0.0
+        self.next_lat = -1.0
+        self.next_lon = -1.0
+        self._sim_t = 0.0
+        self._t_next = 0.0
 
 
     def _load_mqtt_config(self) -> None:
@@ -158,6 +162,7 @@ class GPSPublisher:
 
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
+        self.client.on_message = self._on_message
 
 
     def _on_connect(self, client, userdata, flags, rc):
@@ -168,12 +173,64 @@ class GPSPublisher:
                     client.publish(self.status_topic, json.dumps({"status": "online", "ts": now_iso()}), qos=1, retain=True)
                 except Exception:
                     LOG.debug("Failed to publish online status")
+            try:
+                client.subscribe(self.control_topic)
+            except Exception:
+                LOG.debug("Failed to subscribe to %s", self.control_topic)
         else:
             LOG.error("MQTT connect failed with rc=%s", rc)
 
 
     def _on_disconnect(self, client, userdata, rc):
         LOG.warning("Disconnected from broker (rc=%s)", rc)
+
+    @staticmethod
+    def _bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+        phi1 = math.radians(lat1)
+        phi2 = math.radians(lat2)
+        dlambda = math.radians(lon2 - lon1)
+        y = math.sin(dlambda) * math.cos(phi2)
+        x = math.cos(phi1) * math.sin(phi2) - math.sin(phi1) * math.cos(phi2) * math.cos(dlambda)
+        brng = math.degrees(math.atan2(y, x))
+        return (brng + 360.0) % 360.0
+
+    @staticmethod
+    def _move(lat: float, lon: float, hdg: float, dist: float) -> Tuple[float, float]:
+        R = 6371000.0
+        d = dist / R
+        lat1 = math.radians(lat)
+        lon1 = math.radians(lon)
+        br = math.radians(hdg)
+        lat2 = math.asin(math.sin(lat1) * math.cos(d) + math.cos(lat1) * math.sin(d) * math.cos(br))
+        lon2 = lon1 + math.atan2(math.sin(br) * math.sin(d) * math.cos(lat1),
+                                 math.cos(d) - math.sin(lat1) * math.sin(lat2))
+        return math.degrees(lat2), (math.degrees(lon2) + 540.0) % 360.0 - 180.0
+
+    def _on_message(self, client, userdata, msg):
+        if msg.topic != self.control_topic:
+            return
+        try:
+            data = json.loads(msg.payload.decode())
+        except Exception:
+            return
+        ctrl = str(data.get("control", "")).upper()
+        if ctrl == "STOP":
+            self._active = False
+            return
+        if ctrl in ("VECTOR", "ROUTE"):
+            self.lat = float(data.get("lat", 0.0))
+            self.lon = float(data.get("lon", 0.0))
+            self.spd = float(data.get("spd", 0.0))
+            self.next_lat = float(data.get("next_lat", -1.0))
+            self.next_lon = float(data.get("next_lon", -1.0))
+            if ctrl == "ROUTE" and self.next_lat != -1 and self.next_lon != -1:
+                self.hdg = self._bearing(self.lat, self.lon, self.next_lat, self.next_lon)
+            else:
+                self.hdg = float(data.get("hdg", 0.0))
+            self.mode = ctrl
+            self._active = True
+            self._sim_t = 0.0
+            self._t_next = time.time()
 
 
     def start(self) -> None:
@@ -203,24 +260,24 @@ class GPSPublisher:
             pub_hz = float(self.gps.publish_rate_hz) if getattr(self.gps, "publish_rate_hz", None) else float(self.gps.update_rate_hz)
         except Exception:
             pub_hz = 1.0
-
         if pub_hz <= 0.0:
             pub_hz = 1.0
-
         dt_pub = 1.0 / float(pub_hz)
-        t_next = time.time()
-        sim_start = time.time()
 
         self._running = True
         LOG.info("Starting GPS publisher: publish_rate=%.2fHz -> topic %s (qos=%d)", pub_hz, self.topic, self.qos)
 
         try:
             while self._running:
+                if not self._active:
+                    time.sleep(0.1)
+                    continue
                 now_t = time.time()
-                sim_t = now_t - sim_start
-                if now_t >= t_next:
-                    # Produce one sample at sim_t using scenario-defined motion
-                    sample = self.gps.sample(sim_t, motion_provider=self.route.gps_motion)
+                if now_t >= self._t_next:
+                    dist = self.spd * dt_pub
+                    self.lat, self.lon = self._move(self.lat, self.lon, self.hdg, dist)
+                    self._sim_t += dt_pub
+                    sample = self.gps.sample(self._sim_t, lambda t: (self.lat, self.lon, 0.0, self.spd * MS_TO_KNOTS, self.hdg, 0.0))
                     meas = sample.get("meas", {})
                     speed_knots = meas.get("speed")
                     meas_out = {
@@ -231,34 +288,28 @@ class GPSPublisher:
                         "fix": meas.get("fix_type"),
                         "ts": meas.get("ts"),
                     }
-
-                    # Optional validation
                     if self.validate_schema and self._validator is not None:
                         try:
                             self._validator.validate(meas_out)
                         except ValidationError as ve:
                             LOG.warning("Outgoing GPS payload failed schema validation: %s", ve.message)
-                            # skip this publish (sleep until next tick to avoid busy-loop)
-                            t_next += dt_pub
+                            self._t_next += dt_pub
                             time.sleep(dt_pub)
                             continue
-
                     if self.log_messages:
                         try:
                             log_msg = {"topic": self.topic, "ts_local": now_iso(), "payload": meas_out}
                             LOG.info(json.dumps(log_msg, separators=(",", ":"), ensure_ascii=False))
                         except Exception:
                             LOG.debug("Failed to log outgoing message")
-
                     try:
                         self.client.publish(self.topic, json.dumps(meas_out, separators=(",", ":")), qos=self.qos, retain=False)
                         LOG.debug("Published to %s", self.topic)
                     except Exception as e:
                         LOG.warning("Failed to publish GPS payload: %s", e)
-                    t_next += dt_pub
+                    self._t_next += dt_pub
                 else:
-                    # sleep until next scheduled publish to avoid busy-loop
-                    sleep_dur = t_next - now_t
+                    sleep_dur = self._t_next - now_t
                     if sleep_dur > 0:
                         time.sleep(min(sleep_dur, dt_pub))
         except KeyboardInterrupt:

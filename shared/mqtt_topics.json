@@ -50,6 +50,41 @@
         }
       }
     },
+    "land/imu": {
+      "description": "IMU simulation control",
+      "direction": "publisher=station, subscriber=imu_sim",
+      "qos_recommended": 0,
+      "schema": {
+        "type": "object",
+        "required": ["amp", "freq", "spike_prob", "spike_amp", "heading", "control"],
+        "properties": {
+          "amp": {"type": "number"},
+          "freq": {"type": "number"},
+          "spike_prob": {"type": "number"},
+          "spike_amp": {"type": "number"},
+          "heading": {"type": "number"},
+          "control": {"type": "string", "enum": ["START", "STOP"]}
+        }
+      }
+    },
+    "land/gps": {
+      "description": "GPS simulation control",
+      "direction": "publisher=station, subscriber=gps_sim",
+      "qos_recommended": 0,
+      "schema": {
+        "type": "object",
+        "required": ["lat", "lon", "hdg", "spd", "next_lat", "next_lon", "control"],
+        "properties": {
+          "lat": {"type": "number"},
+          "lon": {"type": "number"},
+          "hdg": {"type": "number"},
+          "spd": {"type": "number"},
+          "next_lat": {"type": "number"},
+          "next_lon": {"type": "number"},
+          "control": {"type": "string", "enum": ["ROUTE", "VECTOR", "STOP"]}
+        }
+      }
+    },
     "sensor/imu": {
       "description": "Re published IMU values from ESP32",
       "direction": "publisher=esp32_sim, subscriber=station",

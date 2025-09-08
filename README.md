@@ -52,17 +52,19 @@ docker compose up --build imu_sim
 
 ## MQTT Topics
 
-| Topic | Emisor | Receptor | Contenido |
-|-------|--------|----------|-----------|
-| `sim/imu` | Simulador | ESP32 | Simulated IMU values |
-| `sim/gps` | Simulador | ESP32 | Simulated GPS location |
-| `sim/battery` | Simulador | ESP32 | Simulated Battery condition |
-| `sensor/imu` | ESP32 | Estación | Re published IMU values from ESP32 |
-| `sensor/gps` | ESP32 | Estación | Re published GPS location from ESP32 |
-| `sensor/battery` | ESP32 | Estación | Re published Battery condition from ESP32 |
-| `sensor/track` | Radar | Estación | Radar track detections |
-| `sensor/radar` | Radar | Estación | Radar track list |
-| `processed/radar` | Estación | Clientes | Processed radar tracks |
+| Topic | Publisher | Subscriber | Content |
+|-------|-----------|------------|---------|
+| `land/imu` | Station | IMU simulator | IMU simulation control |
+| `land/gps` | Station | GPS simulator | GPS simulation control |
+| `sim/imu` | Simulator | ESP32 | Simulated IMU values |
+| `sim/gps` | Simulator | ESP32 | Simulated GPS location |
+| `sim/battery` | Simulator | ESP32 | Simulated Battery condition |
+| `sensor/imu` | ESP32 | Station | Re published IMU values from ESP32 |
+| `sensor/gps` | ESP32 | Station | Re published GPS location from ESP32 |
+| `sensor/battery` | ESP32 | Station | Re published Battery condition from ESP32 |
+| `sensor/track` | Radar | Station | Radar track detections |
+| `sensor/radar` | Radar | Station | Radar track list |
+| `processed/radar` | Station | Clients | Processed radar tracks |
 
 ## Future plans
 

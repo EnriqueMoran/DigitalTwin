@@ -8,6 +8,7 @@ import CamerasViewer from '../components/CamerasViewer';
 import SensorData from '../components/SensorData';
 import SystemStatus from '../components/SystemStatus';
 import Widgets from '../components/Widgets';
+import SimulationManager from '../components/SimulationManager';
 
 const MISSION_THRESHOLD = 35; // meters
 
@@ -21,6 +22,7 @@ const panelOptions = [
   { value: 'sensorData', label: 'Sensor Data', component: SensorData },
   { value: 'systemStatus', label: 'System Status', component: SystemStatus },
   { value: 'widgets', label: 'Widgets', component: Widgets },
+  { value: 'simulationManager', label: 'Simulation Manager', component: SimulationManager },
 ];
 
 // Opciones ordenadas alfabéticamente por etiqueta para los dropdowns

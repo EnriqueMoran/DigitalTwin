@@ -3,7 +3,7 @@ import json
 import os
 import time
 from datetime import datetime
-from math import atan2, cos, radians, sin, sqrt, pi
+from math import atan2, cos, radians, sin, sqrt, pi, isfinite
 from pathlib import Path
 from typing import Dict, Any, Set
 
@@ -358,6 +358,28 @@ async def websocket_endpoint(ws: WebSocket):
 
 @app.get("/health")
 async def health() -> Dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.post("/sim/imu")
+async def sim_imu(payload: Dict[str, Any]) -> Dict[str, str]:
+    if MQTT_CLIENT:
+        heading = STATE.get("heading")
+        try:
+            h = float(heading)
+            if not isfinite(h):
+                h = -1.0
+        except Exception:
+            h = -1.0
+        out = {**payload, "heading": h}
+        MQTT_CLIENT.publish("land/imu", json.dumps(out))
+    return {"status": "ok"}
+
+
+@app.post("/sim/gps")
+async def sim_gps(payload: Dict[str, Any]) -> Dict[str, str]:
+    if MQTT_CLIENT:
+        MQTT_CLIENT.publish("land/gps", json.dumps(payload))
     return {"status": "ok"}
 
 
