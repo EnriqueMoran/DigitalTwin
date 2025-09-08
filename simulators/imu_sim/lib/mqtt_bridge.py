@@ -48,7 +48,10 @@ class IMUPublisher:
         self._load_mqtt_config()
         self.control_topic = "land/imu"
         self.wave_cfg = {"amp": 0.0, "freq": 0.0, "spike_prob": 0.0, "spike_amp": 0.0}
-        self.heading = 0.0
+        # Heading control from land/imu (degrees). When negative, yaw simulation disabled.
+        self.heading = -1.0
+        self._base_heading_deg = 0.0
+        self._disable_yaw = True
         self._active = False
         self._sim_start = 0.0
 
@@ -197,8 +200,17 @@ class IMUPublisher:
                 "spike_prob": float(data.get("spike_prob", 0.0)),
                 "spike_amp": float(data.get("spike_amp", 0.0)),
             }
-            h = float(data.get("heading", 0.0))
-            self.heading = h if h >= 0 else 0.0
+            if "heading" in data:
+                try:
+                    h = float(data.get("heading"))
+                    self.heading = h
+                    if h >= 0:
+                        self._base_heading_deg = h
+                        self._disable_yaw = False
+                    else:
+                        self._disable_yaw = True
+                except Exception:
+                    pass
             self._active = True
             self._sim_start = time.time()
             now = time.time()
@@ -207,6 +219,19 @@ class IMUPublisher:
             self._t_next_mag = now
         elif ctrl == "STOP":
             self._active = False
+        else:
+            # Treat messages without START/STOP as heading updates
+            if "heading" in data:
+                try:
+                    h = float(data.get("heading"))
+                    self.heading = h
+                    if h >= 0:
+                        self._base_heading_deg = h
+                        self._disable_yaw = False
+                    else:
+                        self._disable_yaw = True
+                except Exception:
+                    pass
 
     def _motion(self, t: float):
         amp = float(self.wave_cfg.get("amp", 0.0))
@@ -225,11 +250,11 @@ class IMUPublisher:
         roll_deg = amp * np.sin(2.0 * np.pi * freq * t) + roll_spike
         pitch_deg = (amp / 2.0) * np.sin(2.0 * np.pi * freq * t + np.pi / 2.0) + pitch_spike
 
-        if self.heading <= 0 and self.heading != 0:
+        if self._disable_yaw:
             yaw_wave_amp_deg = 0.0
-            base_heading_deg = 0.0
+            base_heading_deg = float(self._base_heading_deg)
         else:
-            base_heading_deg = float(self.heading)
+            base_heading_deg = float(self._base_heading_deg)
             yaw_wave_amp_deg = max(0.2, amp * 0.03)
         yaw_wave = yaw_wave_amp_deg * np.sin(2.0 * np.pi * freq * t + np.pi / 3.0)
         yaw_deg = base_heading_deg + yaw_wave + yaw_spike
@@ -278,11 +303,14 @@ class IMUPublisher:
         self._dt_acc = 1.0 / float(self.imu.accel_odr_hz)
         self._dt_gyro = 1.0 / float(self.imu.gyro_odr_hz)
         self._dt_mag = 1.0 / float(self.imu.mag_odr_hz)
+        # Target publish cadence: 10 Hz
+        self._dt_pub = 0.1
 
         # Next-sample timestamps
         self._t_next_acc = time.time()
         self._t_next_gyro = time.time()
         self._t_next_mag = time.time()
+        self._t_next_pub = time.time()
 
         # Last sampled values
         last_acc = [0.0, 0.0, 0.0]
@@ -341,10 +369,9 @@ class IMUPublisher:
                     self._t_next_mag += self._dt_mag
                     sampled = True
 
-                # Publish only if at least one sensor sampled now
-                if sampled:
-                    # Use the most recent sample time as payload timestamp
-                    latest_sample_ts = max(last_acc_ts, last_gyro_ts, last_mag_ts)
+                # Publish at fixed cadence (10 Hz) using latest samples
+                if now_t >= self._t_next_pub:
+                    latest_sample_ts = max(last_acc_ts, last_gyro_ts, last_mag_ts) or now_t
                     ts_iso = datetime.fromtimestamp(latest_sample_ts, timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
                     payload = {
@@ -367,6 +394,7 @@ class IMUPublisher:
                             validate(instance=payload, schema=self._schema)
                         except ValidationError as ve:
                             LOG.warning("Outgoing payload failed schema validation: %s", ve.message)
+                            self._t_next_pub += self._dt_pub
                             continue
 
                     if self.log_messages:
@@ -381,6 +409,7 @@ class IMUPublisher:
                         LOG.debug("Published seq=%s to %s", payload["seq"], self.topic)
                     except Exception as e:
                         LOG.warning("Failed to publish: %s", e)
+                    self._t_next_pub += self._dt_pub
 
                 # Sleep until the next scheduled sample to avoid busy loop
                 next_events = [self._t_next_acc, self._t_next_gyro, self._t_next_mag]

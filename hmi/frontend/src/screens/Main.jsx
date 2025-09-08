@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { resetSimState } from '../state/simStore';
 import BoatViewer from '../components/BoatViewer';
 import MapPanel from '../components/MapPanel';
 import RadarViewer from '../components/RadarViewer';
@@ -95,6 +96,8 @@ export default function MainScreen({ sensors }) {
       localStorage.removeItem('currentMission');
       localStorage.removeItem('currentWpIdx');
       localStorage.removeItem('gpsTrail');
+      // Also reset simulation forms/store on service restart
+      resetSimState();
     }
     localStorage.setItem('serviceUptime', String(uptime));
   }, [sensors.uptime]);

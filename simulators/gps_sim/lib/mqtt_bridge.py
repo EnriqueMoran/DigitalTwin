@@ -218,6 +218,16 @@ class GPSPublisher:
             self._active = False
             return
         if ctrl in ("VECTOR", "ROUTE"):
+            # Reset internal timebase to avoid decreasing-time errors on restart
+            try:
+                # Reinitialize GPS simulator scheduling (keeps config)
+                self.gps.init_sim(None)
+            except Exception:
+                # Fallback: clear last sample timestamp only
+                try:
+                    self.gps._last_sample_t = None  # type: ignore[attr-defined]
+                except Exception:
+                    pass
             self.lat = float(data.get("lat", 0.0))
             self.lon = float(data.get("lon", 0.0))
             self.spd = float(data.get("spd", 0.0))
@@ -287,6 +297,9 @@ class GPSPublisher:
                         "speed": speed_knots,
                         "fix": meas.get("fix_type"),
                         "ts": meas.get("ts"),
+                        # Also publish course as both COG and heading for downstream consumers
+                        "cog": meas.get("course_deg"),
+                        "heading": meas.get("course_deg"),
                     }
                     if self.validate_schema and self._validator is not None:
                         try:

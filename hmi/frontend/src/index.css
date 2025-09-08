@@ -188,6 +188,20 @@ body {
   gap: 0.5rem;
 }
 
+/* Align Simulation Manager form rows */
+.simulation-manager .field-row label {
+  width: 60px;
+  flex: 0 0 60px;
+}
+.simulation-manager .field-row input[type='text'],
+.simulation-manager .field-row input[type='number'] {
+  width: 240px;
+  max-width: 100%;
+}
+.simulation-manager .field-row button {
+  width: 90px;
+}
+
 .button-row {
   display: flex;
   gap: 0.5rem;

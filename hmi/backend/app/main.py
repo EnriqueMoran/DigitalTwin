@@ -158,6 +158,9 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         lon = payload.get("lon")
         alt = payload.get("alt")
         spd_knots = payload.get("speed")
+        # Optional heading in degrees from GPS (mirror of COG).
+        # Convert to radians to keep internal units consistent.
+        heading_deg = payload.get("heading")
         ts = _parse_ts(payload.get("ts"))
         STATE["latitude"] = lat
         STATE["longitude"] = lon
@@ -166,6 +169,11 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         spd = spd_knots * 0.514444 if spd_knots is not None else None
         STATE["true_speed"] = spd
         STATE["latency"] = LAST_MESSAGE_TIME - ts
+        if heading_deg is not None:
+            try:
+                STATE["heading"] = radians(float(heading_deg))
+            except Exception:
+                pass
         if _prev_gps:
             dt = ts - _prev_gps["ts"]
             if dt > 0:
@@ -380,6 +388,18 @@ async def sim_imu(payload: Dict[str, Any]) -> Dict[str, str]:
 async def sim_gps(payload: Dict[str, Any]) -> Dict[str, str]:
     if MQTT_CLIENT:
         MQTT_CLIENT.publish("land/gps", json.dumps(payload))
+        # Also update IMU baseline heading so it can simulate small yaw variations.
+        try:
+            ctrl = str(payload.get("control", "")).upper()
+            hdg_val = payload.get("hdg")
+            if ctrl == "VECTOR" and hdg_val is not None:
+                imu_msg = {"heading": float(hdg_val)}
+            else:
+                # For ROUTE or STOP (or missing hdg), disable yaw simulation
+                imu_msg = {"heading": -1}
+            MQTT_CLIENT.publish("land/imu", json.dumps(imu_msg))
+        except Exception:
+            pass
     return {"status": "ok"}
 
 

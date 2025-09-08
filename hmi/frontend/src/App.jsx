@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { useSimStore } from './state/simStore';
 import MainScreen from './screens/Main';
 
 function App() {
@@ -12,6 +13,10 @@ function App() {
     lastImu: null,
     lastGps: null,
   });
+
+  // Simulation override: if any simulator is active, force connection to SIMULATION
+  const { imuActive, gpsActive } = useSimStore((s) => ({ imuActive: s.imuActive, gpsActive: s.gpsActive }));
+  const simActive = imuActive || gpsActive;
 
   useEffect(() => {
     const wsUrl = import.meta.env.VITE_BACKEND_WS || 'ws://localhost:8001/ws';
@@ -91,18 +96,20 @@ function App() {
   const lastMessage = status.lastMessage
     ? new Date(status.lastMessage * 1000)
     : null;
+  const effectiveConnection = simActive ? 'Simulation' : status.connection;
   const connClass =
     {
       OK: 'green',
       Inactive: 'red',
       Degraded: 'orange',
       Initializing: 'lightgreen',
+      SIMULATION: 'blue',
       'Not initialized': 'yellow',
-    }[status.connection] || 'red';
+    }[effectiveConnection] || 'red';
   const connectionDisplay =
-    status.connection === 'Inactive' && lastMessage
+    effectiveConnection === 'Inactive' && lastMessage
       ? `Inactive (Last message: ${lastMessage.toLocaleTimeString()})`
-      : status.connection;
+      : effectiveConnection;
 
   return (
     <>
@@ -119,9 +126,9 @@ function App() {
             <MainScreen
               sensors={{
                 ...data.sensors,
-                connection_state: status.connection,
-                imu_state: status.imu,
-                gps_state: status.gps,
+                connection_state: effectiveConnection,
+                imu_state: imuActive ? 'SIMULATED' : status.imu,
+                gps_state: gpsActive ? 'SIMULATED' : status.gps,
                 last_message_time: status.lastMessage,
               }}
             />
