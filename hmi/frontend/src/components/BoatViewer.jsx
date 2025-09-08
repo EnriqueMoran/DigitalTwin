@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-// The boat model is expected at `hmi/frontend/public/boat.glb` but is not tracked in git.
-// The file should be supplied separately and served from the frontend's public directory.
+
 const boatUrl = '/boat.glb';
 
 export default function BoatViewer({ sensors }) {
@@ -41,6 +40,9 @@ export default function BoatViewer({ sensors }) {
       (gltf) => {
         modelRef.current = gltf.scene;
         scene.add(modelRef.current);
+        modelRef.current.rotation.order = 'ZXY';
+        modelRef.current.rotateY(Math.PI / 2);
+
         const box = new THREE.Box3().setFromObject(gltf.scene);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
@@ -55,7 +57,6 @@ export default function BoatViewer({ sensors }) {
       },
       undefined,
       () => {
-        // fallback cube
         const geometry = new THREE.BoxGeometry();
         const material = new THREE.MeshNormalMaterial();
         const cube = new THREE.Mesh(geometry, material);
@@ -70,8 +71,8 @@ export default function BoatViewer({ sensors }) {
       if (liveRef.current && sensorsRef.current && modelRef.current) {
         const { roll = 0, pitch = 0, heading = 0 } = sensorsRef.current;
         modelRef.current.rotation.x = pitch || 0;
-        modelRef.current.rotation.y = -(heading || 0) - Math.PI / 2;
-        modelRef.current.rotation.z = roll || 0;
+        modelRef.current.rotation.y = -(heading || 0);
+        modelRef.current.rotation.z = -(roll || 0);
       }
       controls.update();
       renderer.render(scene, camera);

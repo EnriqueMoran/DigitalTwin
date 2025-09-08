@@ -2,6 +2,8 @@
 
 This repository contains a digital twin of a radio‑controlled warship. The physical craft (60.5 × 8.5 × 17 cm) is based on an ESP32 microcontroller with multiple sensors. The project mirrors that setup with containerised simulators, an MQTT broker and a web human–machine interface (HMI).
 
+3D Model source: https://sketchfab.com/3d-models/type-055-renhai-class-destroyer-free-c0a3c5cb49fd4b688b65e4f3a18b5917
+
 <img src="./hmi_example.gif" alt="App features" style="display:block; width:100%; height:auto; margin:0 auto;" />
 
 
