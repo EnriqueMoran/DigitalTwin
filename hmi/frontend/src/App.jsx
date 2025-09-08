@@ -44,12 +44,18 @@ function App() {
           if (gpsValid) lastGps = now;
         }
 
+        // Connection state machine
         let connection = prev.connection;
-        if (prev.connection === 'Not initialized' || prev.connection === 'Inactive') {
+        const allOk = imu === 'OK' && gps === 'OK';
+        if (prev.connection === 'Not initialized') {
           connection = 'Initializing';
+        } else if (prev.connection === 'Initializing') {
+          connection = allOk ? 'OK' : 'Initializing';
+        } else if (prev.connection === 'Inactive') {
+          connection = allOk ? 'OK' : 'Degraded';
+        } else {
+          connection = allOk ? 'OK' : 'Degraded';
         }
-        if (imu === 'OK' && gps === 'OK') connection = 'OK';
-        else if (connection !== 'Initializing') connection = 'Degraded';
 
         return { connection, imu, gps, lastMessage: now, lastImu, lastGps };
       });
@@ -66,9 +72,15 @@ function App() {
         if (lastImu && now - lastImu > 10) imu = 'Inactive';
         if (lastGps && now - lastGps > 10) gps = 'Inactive';
         if (connection !== 'Inactive') {
-          if (imu === 'OK' && gps === 'OK') connection = 'OK';
-          else if (connection === 'Not initialized') connection = 'Initializing';
-          else connection = 'Degraded';
+          const allOk = imu === 'OK' && gps === 'OK';
+          if (prev.connection === 'Not initialized') {
+            // No messages yet; remain Not initialized until first message arrives
+            connection = 'Not initialized';
+          } else if (prev.connection === 'Initializing') {
+            connection = allOk ? 'OK' : 'Initializing';
+          } else {
+            connection = allOk ? 'OK' : 'Degraded';
+          }
         }
         return { connection, imu, gps, lastMessage, lastImu, lastGps };
       });

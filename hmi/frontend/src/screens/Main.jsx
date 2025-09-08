@@ -23,11 +23,14 @@ const panelOptions = [
   { value: 'widgets', label: 'Widgets', component: Widgets },
 ];
 
+// Opciones ordenadas alfabéticamente por etiqueta para los dropdowns
+const sortedPanelOptions = [...panelOptions].sort((a, b) => a.label.localeCompare(b.label));
+
 export default function MainScreen({ sensors }) {
   const [leftPanel, setLeftPanel] = useState('3d');
   const [rightPanel, setRightPanel] = useState('gps');
-  const [bottomLeftPanel, setBottomLeftPanel] = useState('sensorData');
-  const [bottomCenterPanel, setBottomCenterPanel] = useState('systemStatus');
+  const [bottomLeftPanel, setBottomLeftPanel] = useState('systemStatus');
+  const [bottomCenterPanel, setBottomCenterPanel] = useState('sensorData');
   const [bottomRightPanel, setBottomRightPanel] = useState('widgets');
   const [missionsState, setMissionsState] = useState(() => {
     try {
@@ -190,7 +193,7 @@ export default function MainScreen({ sensors }) {
       <div className="top-panels">
         <div className="panel-container">
           <select value={leftPanel} onChange={(e) => setLeftPanel(e.target.value)}>
-            {panelOptions.map((o) => (
+            {sortedPanelOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
@@ -200,7 +203,7 @@ export default function MainScreen({ sensors }) {
         </div>
         <div className="panel-container">
           <select value={rightPanel} onChange={(e) => setRightPanel(e.target.value)}>
-            {panelOptions.map((o) => (
+            {sortedPanelOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
@@ -212,7 +215,7 @@ export default function MainScreen({ sensors }) {
       <div className="bottom-panels">
         <div className="panel-container">
           <select value={bottomLeftPanel} onChange={(e) => setBottomLeftPanel(e.target.value)}>
-            {panelOptions.map((o) => (
+            {sortedPanelOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
@@ -222,7 +225,7 @@ export default function MainScreen({ sensors }) {
         </div>
         <div className="panel-container">
           <select value={bottomCenterPanel} onChange={(e) => setBottomCenterPanel(e.target.value)}>
-            {panelOptions.map((o) => (
+            {sortedPanelOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
@@ -232,7 +235,7 @@ export default function MainScreen({ sensors }) {
         </div>
         <div className="panel-container">
           <select value={bottomRightPanel} onChange={(e) => setBottomRightPanel(e.target.value)}>
-            {panelOptions.map((o) => (
+            {sortedPanelOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>

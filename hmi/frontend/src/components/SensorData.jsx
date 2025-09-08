@@ -15,13 +15,13 @@ export default function SensorData({ sensors = {} }) {
   };
 
   const fmt = (v, unit = '', transform) => {
-    if (v === undefined || v === null) return 'Null';
+    if (v === undefined || v === null) return 'Unavaliable';
     const val = transform ? transform(v) : v;
     return `${val}${unit}`;
   };
 
   const fmtLatLon = (v) => {
-    if (v === undefined || v === null) return 'Null';
+    if (v === undefined || v === null) return 'Unavaliable';
     const dec = Number(v).toFixed(12);
     const extraSpace = v >= 0 ? ' ' : '';
     return `${toDMS(v)}${extraSpace} (${dec})`;

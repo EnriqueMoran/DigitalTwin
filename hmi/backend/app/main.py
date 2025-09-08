@@ -42,6 +42,8 @@ STATE: Dict[str, Any] = {
 }
 
 LAST_MESSAGE_TIME: float | None = None
+# Track last time we received data from ESP32 (sensor/* topics)
+ESP32_LAST_MESSAGE_TIME: float | None = None
 WEBSOCKETS: Set[WebSocket] = set()
 MQTT_CLIENT: mqtt.Client | None = None
 EVENT_LOOP: asyncio.AbstractEventLoop | None = None
@@ -49,6 +51,7 @@ _last_broadcast: float = 0.0
 # Service start time (monotonic) to compute uptime
 _service_start_monotonic: float = time.monotonic()
 _last_processed: float = 0.0
+_esp32_start_monotonic: float | None = None
 
 MQTT_HOST = os.getenv("MQTT_HOST", "mosquitto")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
@@ -135,7 +138,7 @@ def _on_connect(client: mqtt.Client, userdata, flags, rc):
 
 
 def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
-    global LAST_MESSAGE_TIME, _prev_gps, _prev_imu_ts, _est_velocity, _last_processed, _est_heading
+    global LAST_MESSAGE_TIME, ESP32_LAST_MESSAGE_TIME, _prev_gps, _prev_imu_ts, _est_velocity, _last_processed, _est_heading
     now = time.monotonic()
     if now - _last_processed < 0.1:
         return
@@ -148,6 +151,9 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
     LAST_MESSAGE_TIME = time.time()
 
     if topic in (TOPIC_SENSOR_GPS, TOPIC_SIM_GPS):
+        # If this is a sensor/* GPS message, mark ESP32 last seen
+        if topic == TOPIC_SENSOR_GPS:
+            ESP32_LAST_MESSAGE_TIME = time.time()
         lat = payload.get("lat")
         lon = payload.get("lon")
         alt = payload.get("alt")
@@ -170,6 +176,9 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         _prev_gps = {"lat": lat, "lon": lon, "ts": ts}
 
     elif topic in (TOPIC_SENSOR_IMU, TOPIC_SIM_IMU):
+        # If this is a sensor/* IMU message, mark ESP32 last seen
+        if topic == TOPIC_SENSOR_IMU:
+            ESP32_LAST_MESSAGE_TIME = time.time()
         ax = payload.get("ax")
         ay = payload.get("ay")
         az = payload.get("az")
@@ -228,6 +237,9 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         STATE["latency"] = LAST_MESSAGE_TIME - ts
 
     elif topic in (TOPIC_SENSOR_BATTERY, TOPIC_SIM_BATTERY):
+        # If this is a sensor/* Battery message, mark ESP32 last seen
+        if topic == TOPIC_SENSOR_BATTERY:
+            ESP32_LAST_MESSAGE_TIME = time.time()
         soc = payload.get("soc")
         if soc is not None:
             if soc <= 1:
@@ -269,17 +281,30 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
             ]
 
 async def _broadcast_loop():
-    global _last_broadcast
+    global _last_broadcast, _esp32_start_monotonic
     while True:
         now = time.monotonic()
         if now - _last_broadcast >= 0.1:
             _last_broadcast = now
-            # Update service uptime based on monotonic clock
+            # Determine ESP32 connectivity and set uptime based on it
             try:
-                STATE["uptime"] = int(max(0, time.monotonic() - _service_start_monotonic))
+                # Consider ESP32 connected if we've seen sensor/* recently (<= 10s)
+                esp32_connected = False
+                if ESP32_LAST_MESSAGE_TIME is not None:
+                    esp32_connected = (time.time() - ESP32_LAST_MESSAGE_TIME) <= 10.0
+
+                if not esp32_connected:
+                    # Reset start marker and uptime if disconnected
+                    _esp32_start_monotonic = None  # type: ignore
+                    STATE["uptime"] = 0
+                else:
+                    # Initialize start time at first connection
+                    if _esp32_start_monotonic is None:
+                        _esp32_start_monotonic = time.monotonic()  # type: ignore
+                    STATE["uptime"] = int(max(0, time.monotonic() - (_esp32_start_monotonic or now)))
             except Exception:
-                # Fallback in case of unexpected errors
-                STATE["uptime"] = int(now)
+                # Fallback: keep uptime at 0 on error
+                STATE["uptime"] = 0
 
             # Snapshot data to send
             data = {"sensors": STATE, "last_message_time": LAST_MESSAGE_TIME}

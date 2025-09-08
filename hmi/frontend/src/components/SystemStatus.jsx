@@ -58,7 +58,7 @@ function gps_quality_percent(quality, gsa_mode, hdop, avg_snr, sats_used, sats_i
 }
 
 function formatHHMMSS(s) {
-  if (s == null) return 'Null';
+  if (s == null) return 'Unavaliable';
   const sec = Number(s);
   const h = String(Math.floor(sec / 3600)).padStart(2, '0');
   const m = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
@@ -68,13 +68,13 @@ function formatHHMMSS(s) {
 
 export default function SystemStatus({ sensors = {} }) {
   const fmt = (v, unit = '', transform) => {
-    if (v === undefined || v === null) return 'Null';
+    if (v === undefined || v === null) return 'Unavaliable';
     const val = transform ? transform(v) : v;
     return `${val}${unit}`;
   };
   const toFixed = (d) => (v) => Number(v).toFixed(d);
   const lastMsg = sensors.last_message_time != null ? new Date(sensors.last_message_time * 1000).toLocaleTimeString() : null;
-  const connectionDisplay = sensors.connection_state === 'Inactive' && lastMsg ? `Inactive (Last message: ${lastMsg})` : sensors.connection_state ?? 'Null';
+  const connectionDisplay = sensors.connection_state === 'Inactive' && lastMsg ? `Inactive (Last message: ${lastMsg})` : sensors.connection_state ?? 'Unavaliable';
 
   const quality = gps_quality_percent(
     sensors.gps_fix_quality,
@@ -94,12 +94,12 @@ export default function SystemStatus({ sensors = {} }) {
     if (q === 2) return 'DGPS';
     if (m === 2) return '2D';
     if (m === 3) return '3D';
-    return 'Unknown';
+    return 'Unavaliable';
   })();
 
   const precisionText = (() => {
     const h = sensors.hdop;
-    if (h == null) return 'Unknown';
+    if (h == null) return 'Unavaliable';
     if (h < 1) return 'Excellent';
     if (h < 2) return 'Very good';
     if (h < 5) return 'Acceptable';
@@ -143,7 +143,7 @@ export default function SystemStatus({ sensors = {} }) {
         'Satellites Used/Available',
         sensors.sats_used != null || sensors.sats_in_view != null
           ? `${sensors.sats_used || 0}/${sensors.sats_in_view || 0}`
-          : 'Null',
+          : 'Unavaliable',
       ],
       ['Precision', precisionText],
     ],

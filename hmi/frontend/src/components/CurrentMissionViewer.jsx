@@ -27,7 +27,7 @@ export default function CurrentMissionViewer({
   };
 
   const fmtLatLon = (v) => {
-    if (v === undefined || v === null) return 'Null';
+    if (v === undefined || v === null) return 'Unavaliable';
     return toDMS(Number(v));
   };
 
@@ -110,16 +110,15 @@ export default function CurrentMissionViewer({
             <td>
               {target
                 ? `${fmtLatLon(Number(target.lat))}, ${fmtLatLon(Number(target.lon))}`
-                : 'Null'}
-            </td>
-          </tr>
-          <tr>
-            <td>Distance (m)</td>
-            <td>{remaining !== null ? remaining.toFixed(2) : 'Null'}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+                : 'Unavaliable'}
+          </td>
+        </tr>
+        <tr>
+          <td>Distance (m)</td>
+          <td>{remaining !== null ? remaining.toFixed(2) : 'Unavaliable'}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
   );
 }
-
