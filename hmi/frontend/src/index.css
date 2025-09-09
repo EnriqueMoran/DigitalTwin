@@ -28,6 +28,7 @@ body {
 .dot.red { background: #f00; }
 .dot.orange { background: orange; }
 .dot.lightgreen { background: #9f9; }
+.dot.blue { background: #08f; }
 .dot.yellow { background: #ff0; }
 .last-message {
   margin-left: 0.5rem;
@@ -37,10 +38,12 @@ body {
   display: flex;
   flex-direction: column;
   height: calc(100vh - 40px);
+  min-height: 0; /* allow children to size via flex without overflow pushing layout */
 }
 .top-panels {
   display: flex;
-  flex: 1 1 60%;
+  flex: 1 1 60%;        /* takes remaining space above bottom panels */
+  min-height: 0;         /* allow shrinking without content forcing growth */
 }
 .panel-container {
   flex: 1;
@@ -56,7 +59,8 @@ body {
 }
 .bottom-panels {
   display: flex;
-  flex: 1 1 40%;
+  flex: 0 0 40%;        /* fixed height: 40% of available main-screen */
+  min-height: 0;        /* prevent content from expanding the container */
 }
 .panel {
   flex: 1;
@@ -64,6 +68,7 @@ body {
   background: #1e1e1e;
   position: relative;
   overflow: hidden;
+  min-height: 0;         /* needed so inner scroll areas don't push height */
 }
 
 .bottom-panels .panel {
@@ -337,9 +342,19 @@ body {
   row-gap: 0.125rem;
   width: max-content; /* shrink to content */
   margin: 0.25rem auto 0; /* center under widget */
+  align-items: center; /* vertically center label/value rows */
 }
 .kv-key { text-align: left; }
 .kv-value { text-align: right; }
+/* Fixed-width numeric output for HDG/COG so text doesn't shift */
+.value-kv .kv-value {
+  font-variant-numeric: tabular-nums; /* keep stable digit widths */
+  font-family: inherit; /* same font as labels */
+  font-size: inherit;
+  font-weight: inherit;
+  display: inline-block;
+  min-width: 4ch; /* 3 digits + degree symbol */
+}
 
 /* Align all panel titles with System Status */
 .panel h3 {

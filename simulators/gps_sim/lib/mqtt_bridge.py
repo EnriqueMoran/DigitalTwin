@@ -56,7 +56,9 @@ class GPSPublisher:
         self.next_lat = -1.0
         self.next_lon = -1.0
         self._sim_t = 0.0
-        self._t_next = 0.0
+        # Anchored scheduling for 10 Hz publishing
+        self._t0_pub = None  # type: Optional[float]
+        self._last_tick = -1
 
 
     def _load_mqtt_config(self) -> None:
@@ -218,12 +220,10 @@ class GPSPublisher:
             self._active = False
             return
         if ctrl in ("VECTOR", "ROUTE"):
-            # Reset internal timebase to avoid decreasing-time errors on restart
+            # Reset internal timebase to avoid decreasing-time issues and bursts
             try:
-                # Reinitialize GPS simulator scheduling (keeps config)
                 self.gps.init_sim(None)
             except Exception:
-                # Fallback: clear last sample timestamp only
                 try:
                     self.gps._last_sample_t = None  # type: ignore[attr-defined]
                 except Exception:
@@ -240,7 +240,9 @@ class GPSPublisher:
             self.mode = ctrl
             self._active = True
             self._sim_t = 0.0
-            self._t_next = time.time()
+            # Anchor 10 Hz schedule to current monotonic time
+            self._t0_pub = time.monotonic()
+            self._last_tick = -1
 
 
     def start(self) -> None:
@@ -282,11 +284,17 @@ class GPSPublisher:
                 if not self._active:
                     time.sleep(0.1)
                     continue
-                now_t = time.time()
-                if now_t >= self._t_next:
-                    dist = self.spd * dt_pub
+                now_m = time.monotonic()
+                if self._t0_pub is None:
+                    self._t0_pub = now_m
+                    self._last_tick = -1
+                # Publish at most one sample per loop; advance simulation to current tick
+                tick = int((now_m - self._t0_pub) / dt_pub)
+                if tick > self._last_tick:
+                    steps = max(1, tick - self._last_tick)
+                    dist = self.spd * dt_pub * steps
                     self.lat, self.lon = self._move(self.lat, self.lon, self.hdg, dist)
-                    self._sim_t += dt_pub
+                    self._sim_t += dt_pub * steps
                     sample = self.gps.sample(self._sim_t, lambda t: (self.lat, self.lon, 0.0, self.spd * MS_TO_KNOTS, self.hdg, 0.0))
                     meas = sample.get("meas", {})
                     speed_knots = meas.get("speed")
@@ -320,9 +328,11 @@ class GPSPublisher:
                         LOG.debug("Published to %s", self.topic)
                     except Exception as e:
                         LOG.warning("Failed to publish GPS payload: %s", e)
-                    self._t_next += dt_pub
+                    self._last_tick = tick
                 else:
-                    sleep_dur = self._t_next - now_t
+                    # Sleep until next anchored tick
+                    next_time = self._t0_pub + (self._last_tick + 1) * dt_pub
+                    sleep_dur = max(0.0, next_time - now_m)
                     if sleep_dur > 0:
                         time.sleep(min(sleep_dur, dt_pub))
         except KeyboardInterrupt:

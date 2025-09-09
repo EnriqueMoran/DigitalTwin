@@ -7,7 +7,7 @@ export const defaultState = {
   gpsLat: '0.0000000000000',
   gpsLon: '0.0000000000000',
   gpsHdg: '0',
-  gpsSpd: '0',
+  gpsSpd: '5',
   gpsActive: false,
   gpsMode: null, // 'ROUTE' | 'VECTOR' | null
   routeNextLat: -1,

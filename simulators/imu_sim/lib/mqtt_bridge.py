@@ -220,7 +220,8 @@ class IMUPublisher:
         elif ctrl == "STOP":
             self._active = False
         else:
-            # Treat messages without START/STOP as heading updates
+            # Treat messages without START/STOP as parameter updates
+            updated = False
             if "heading" in data:
                 try:
                     h = float(data.get("heading"))
@@ -230,8 +231,18 @@ class IMUPublisher:
                         self._disable_yaw = False
                     else:
                         self._disable_yaw = True
+                    updated = True
                 except Exception:
                     pass
+            # Update wave configuration live if provided
+            for k in ("amp", "freq", "spike_prob", "spike_amp"):
+                if k in data:
+                    try:
+                        self.wave_cfg[k] = float(data.get(k, 0.0))
+                        updated = True
+                    except Exception:
+                        pass
+            # If we updated parameters during active run, keep running without restart
 
     def _motion(self, t: float):
         amp = float(self.wave_cfg.get("amp", 0.0))
@@ -303,14 +314,16 @@ class IMUPublisher:
         self._dt_acc = 1.0 / float(self.imu.accel_odr_hz)
         self._dt_gyro = 1.0 / float(self.imu.gyro_odr_hz)
         self._dt_mag = 1.0 / float(self.imu.mag_odr_hz)
-        # Target publish cadence: 10 Hz
+        # Target publish cadence: 10 Hz (anchored)
         self._dt_pub = 0.1
 
         # Next-sample timestamps
         self._t_next_acc = time.time()
         self._t_next_gyro = time.time()
         self._t_next_mag = time.time()
-        self._t_next_pub = time.time()
+        # Anchored publish scheduler
+        self._t0_pub = time.monotonic()
+        self._last_pub_tick = -1
 
         # Last sampled values
         last_acc = [0.0, 0.0, 0.0]
@@ -369,8 +382,10 @@ class IMUPublisher:
                     self._t_next_mag += self._dt_mag
                     sampled = True
 
-                # Publish at fixed cadence (10 Hz) using latest samples
-                if now_t >= self._t_next_pub:
+                # Publish at fixed cadence (10 Hz) using latest samples (anchored)
+                now_m = time.monotonic()
+                tick = int((now_m - self._t0_pub) / self._dt_pub)
+                if tick > self._last_pub_tick:
                     latest_sample_ts = max(last_acc_ts, last_gyro_ts, last_mag_ts) or now_t
                     ts_iso = datetime.fromtimestamp(latest_sample_ts, timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
@@ -409,10 +424,11 @@ class IMUPublisher:
                         LOG.debug("Published seq=%s to %s", payload["seq"], self.topic)
                     except Exception as e:
                         LOG.warning("Failed to publish: %s", e)
-                    self._t_next_pub += self._dt_pub
+                    self._last_pub_tick = tick
 
-                # Sleep until the next scheduled sample to avoid busy loop
-                next_events = [self._t_next_acc, self._t_next_gyro, self._t_next_mag]
+                # Sleep until the next scheduled event (include publish cadence)
+                next_pub_time = self._t0_pub + (self._last_pub_tick + 1) * self._dt_pub
+                next_events = [self._t_next_acc, self._t_next_gyro, self._t_next_mag, next_pub_time]
                 sleep_until = min(next_events) - time.time()
                 if sleep_until > 0:
                     time.sleep(min(max(sleep_until, 0.001), 0.1))

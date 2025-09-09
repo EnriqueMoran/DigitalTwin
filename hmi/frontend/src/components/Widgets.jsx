@@ -153,6 +153,11 @@ function Speedometer({ value = 0, max = 20 }) {
 
 export default function Widgets({ sensors = {} }) {
   const toDeg = (r) => (r * 180) / Math.PI;
+  const fmt3 = (rad) => {
+    let d = ((toDeg(rad ?? 0) % 360) + 360) % 360;
+    d = Math.round(d) % 360;
+    return String(d).padStart(3, '0');
+  };
   return (
     <div>
       <h3>Widgets</h3>

@@ -73,8 +73,8 @@ export default function SystemStatus({ sensors = {} }) {
     return `${val}${unit}`;
   };
   const toFixed = (d) => (v) => Number(v).toFixed(d);
-  const lastMsg = sensors.last_message_time != null ? new Date(sensors.last_message_time * 1000).toLocaleTimeString() : null;
-  const connectionDisplay = sensors.connection_state === 'Inactive' && lastMsg ? `Inactive (Last message: ${lastMsg})` : sensors.connection_state ?? 'Unavaliable';
+  // Connection display: do not show last message time here; the banner already shows it
+  const connectionDisplay = sensors.connection_state ?? 'Unavaliable';
 
   const quality = gps_quality_percent(
     sensors.gps_fix_quality,

@@ -16,6 +16,15 @@ export default function CurrentMissionViewer({
 
   const isActive = mode === 'Mission' && currentMission === selected;
 
+  const normalizeLng = (lng) => {
+    if (!Number.isFinite(lng)) return lng;
+    return ((lng + 180) % 360 + 360) % 360 - 180;
+  };
+  const normalizeLat = (lat) => {
+    if (!Number.isFinite(lat)) return lat;
+    return Math.max(-90, Math.min(90, lat));
+  };
+
   const toDMS = (deg) => {
     const absolute = Math.abs(deg);
     const d = Math.floor(absolute);
@@ -58,7 +67,12 @@ export default function CurrentMissionViewer({
   const lon = lonRaw == null ? NaN : Number(lonRaw);
   const remaining =
     target && Number.isFinite(lat) && Number.isFinite(lon)
-      ? haversine(lat, lon, Number(target.lat), Number(target.lon))
+      ? haversine(
+          normalizeLat(lat),
+          normalizeLng(lon),
+          normalizeLat(Number(target.lat)),
+          normalizeLng(Number(target.lon))
+        )
       : null;
 
   const handleAction = () => {
@@ -96,8 +110,8 @@ export default function CurrentMissionViewer({
             <tr key={idx} className={isActive && idx === currentWpIdx ? 'active' : ''}>
               <td>{idx + 1}</td>
               <td>{idx < currentWpIdx ? '✓' : ''}</td>
-              <td>{Number(wp.lat).toFixed(15)}</td>
-              <td>{Number(wp.lon).toFixed(15)}</td>
+              <td>{normalizeLat(Number(wp.lat)).toFixed(15)}</td>
+              <td>{normalizeLng(Number(wp.lon)).toFixed(15)}</td>
             </tr>
           ))}
         </tbody>
@@ -109,7 +123,7 @@ export default function CurrentMissionViewer({
             <td>Target point</td>
             <td>
               {target
-                ? `${fmtLatLon(Number(target.lat))}, ${fmtLatLon(Number(target.lon))}`
+                ? `${fmtLatLon(normalizeLat(Number(target.lat)))}, ${fmtLatLon(normalizeLng(Number(target.lon)))}`
                 : 'Unavaliable'}
           </td>
         </tr>

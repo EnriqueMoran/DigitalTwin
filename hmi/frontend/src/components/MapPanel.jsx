@@ -14,6 +14,26 @@ const createBoatIcon = (angle = 0) => {
   });
 };
 
+// Normalize helpers to keep coordinates in real-world bounds.
+const normalizeLng = (lng) => {
+  if (!Number.isFinite(lng)) return lng;
+  // Wrap to [-180, 180)
+  return ((lng + 180) % 360 + 360) % 360 - 180;
+};
+
+const normalizeLat = (lat) => {
+  if (!Number.isFinite(lat)) return lat;
+  // WebMercator visual limit is about +/-85.0511; keep within [-90, 90] logically
+  const clamped = Math.max(-90, Math.min(90, lat));
+  return clamped;
+};
+
+const normalizeLatLng = (lat, lng) => {
+  // Use Leaflet's wrap for consistency, then ensure exact numeric normalization
+  const wrapped = L.latLng(lat, lng).wrap();
+  return [normalizeLat(wrapped.lat), normalizeLng(wrapped.lng)];
+};
+
 const createMissionIcon = (num, active) => {
   const cls = active ? 'mission-icon active' : 'mission-icon';
   return L.divIcon({
@@ -89,7 +109,10 @@ export default function MapPanel({
     setPosition(pos);
 
     const map = mapRef.current;
-    if (map && followRef.current) {
+    if (!map) {
+      // Map may not be ready on first GPS fix; request centering on ready
+      pendingCenterRef.current = true;
+    } else if (followRef.current) {
       const now = Date.now();
       if (now - lastPanRef.current >= PAN_MIN_MS) {
         map.panTo(pos);
@@ -118,8 +141,8 @@ export default function MapPanel({
 
     if (pendingCenterRef.current) {
       pendingCenterRef.current = false;
-      const latRaw = sensorsRef.current?.latitude ?? sensorsRef.current?.lat ?? null;
-      const lonRaw = sensorsRef.current?.longitude ?? sensorsRef.current?.lon ?? null;
+      const latRaw = sensorsRef.current?.latitude ?? sensorsRef.current?.lat ?? sensorsRef.current?.y ?? null;
+      const lonRaw = sensorsRef.current?.longitude ?? sensorsRef.current?.lon ?? sensorsRef.current?.lng ?? sensorsRef.current?.long ?? null;
       const lat = latRaw == null ? NaN : Number(latRaw);
       const lon = lonRaw == null ? NaN : Number(lonRaw);
       if (Number.isFinite(lat) && Number.isFinite(lon)) {
@@ -141,9 +164,10 @@ export default function MapPanel({
 
     mapInstance.on('contextmenu', (e) => {
       e.originalEvent.preventDefault();
+      const [latN, lonN] = normalizeLatLng(e.latlng.lat, e.latlng.lng);
       setContextMenu({
-        lat: e.latlng.lat,
-        lon: e.latlng.lng,
+        lat: latN,
+        lon: lonN,
         x: e.containerPoint.x,
         y: e.containerPoint.y,
       });
@@ -195,7 +219,9 @@ export default function MapPanel({
 
   const handleCopyCoords = () => {
     if (!contextMenu) return;
-    const text = `${contextMenu.lat.toFixed(15)}, ${contextMenu.lon.toFixed(15)}`;
+    // Ensure what we copy is wrapped to valid ranges
+    const [latN, lonN] = normalizeLatLng(contextMenu.lat, contextMenu.lon);
+    const text = `${latN.toFixed(15)}, ${lonN.toFixed(15)}`;
     navigator.clipboard?.writeText(text);
     setContextMenu(null);
   };
@@ -205,20 +231,25 @@ export default function MapPanel({
     currentMission === selectedMission ? currentWpIdx : 0;
 
   const missionMarkers = showMission
-    ? missionWps.map((wp, idx) => (
+    ? missionWps.map((wp, idx) => {
+        const lat = Number(wp.lat);
+        const lon = Number(wp.lon);
+        const [latN, lonN] = normalizeLatLng(lat, lon);
+        return (
         <Marker
           key={`m${idx}`}
-          position={[Number(wp.lat), Number(wp.lon)]}
+          position={[latN, lonN]}
           icon={createMissionIcon(idx + 1, idx === activeIdx)}
         />
-      ))
+        );
+      })
     : null;
 
   return (
     <div style={{ height: '100%', width: '100%', position: 'relative' }}>
-      <MapContainer center={[0, 0]} zoom={13} style={{ height: '100%', width: '100%' }}>
+      <MapContainer center={[0, 0]} zoom={13} style={{ height: '100%', width: '100%' }} worldCopyJump={true}>
         <MapReadyListener onReady={handleMapReady} />
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" noWrap={false} />
         <Polyline positions={trail} pathOptions={{ color: 'yellow', dashArray: '4 4' }} />
         {missionMarkers}
         {position && <Marker position={position} icon={memoIcon} ref={markerRef} />}

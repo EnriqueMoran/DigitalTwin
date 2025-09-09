@@ -10,6 +10,15 @@ const formatDecimals = (value) => {
   return Number.isNaN(num) ? value : num.toFixed(DECIMALS);
 };
 
+const normalizeLng = (lng) => {
+  if (!Number.isFinite(lng)) return lng;
+  return ((lng + 180) % 360 + 360) % 360 - 180;
+};
+const normalizeLat = (lat) => {
+  if (!Number.isFinite(lat)) return lat;
+  return Math.max(-90, Math.min(90, lat));
+};
+
 export default function MissionsManagerViewer({ missions = {}, setMissions = () => {} }) {
   const [selected, setSelected] = useState('');
   const [waypoints, setWaypoints] = useState(
@@ -27,8 +36,8 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
       missions[selected].forEach((wp, i) => {
         if (i < MAX_WAYPOINTS) {
           wps[i] = {
-            lat: Number(wp.lat).toFixed(DECIMALS),
-            lon: Number(wp.lon).toFixed(DECIMALS),
+            lat: normalizeLat(Number(wp.lat)).toFixed(DECIMALS),
+            lon: normalizeLng(Number(wp.lon)).toFixed(DECIMALS),
           };
         }
       });
@@ -59,8 +68,8 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
     const converted = waypoints
       .filter((wp) => wp.lat !== '' && wp.lon !== '')
       .map((wp) => ({
-        lat: parseFloat(formatDecimals(wp.lat)),
-        lon: parseFloat(formatDecimals(wp.lon)),
+        lat: normalizeLat(parseFloat(formatDecimals(wp.lat))),
+        lon: normalizeLng(parseFloat(formatDecimals(wp.lon))),
       }));
     setMissions({ ...missions, [selected]: converted });
   };
@@ -70,8 +79,8 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
     const converted = waypoints
       .filter((wp) => wp.lat !== '' && wp.lon !== '')
       .map((wp) => ({
-        lat: parseFloat(formatDecimals(wp.lat)),
-        lon: parseFloat(formatDecimals(wp.lon)),
+        lat: normalizeLat(parseFloat(formatDecimals(wp.lat))),
+        lon: normalizeLng(parseFloat(formatDecimals(wp.lon))),
       }));
     setMissions({ ...missions, [newName]: converted });
     setSelected(newName);
@@ -184,4 +193,3 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
     </div>
   );
 }
-

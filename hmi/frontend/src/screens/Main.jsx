@@ -11,7 +11,7 @@ import SystemStatus from '../components/SystemStatus';
 import Widgets from '../components/Widgets';
 import SimulationManager from '../components/SimulationManager';
 
-const MISSION_THRESHOLD = 35; // meters
+const MISSION_THRESHOLD = 2; // meters
 
 const panelOptions = [
   { value: '3d', label: '3D Model', component: BoatViewer },
@@ -119,11 +119,18 @@ export default function MainScreen({ sensors }) {
       sensors.lng ??
       sensors.long ??
       null;
+    const normalizeLng = (lng) => ((lng + 180) % 360 + 360) % 360 - 180;
+    const normalizeLat = (lat) => Math.max(-90, Math.min(90, lat));
     const lat = latRaw == null ? NaN : Number(latRaw);
     const lon = lonRaw == null ? NaN : Number(lonRaw);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
     const wp = mission[currentWpIdx];
-    const dist = haversine(lat, lon, Number(wp.lat), Number(wp.lon));
+    const dist = haversine(
+      normalizeLat(lat),
+      normalizeLng(lon),
+      normalizeLat(Number(wp.lat)),
+      normalizeLng(Number(wp.lon))
+    );
     if (dist <= MISSION_THRESHOLD) {
       if (currentWpIdx + 1 >= mission.length) {
         setMode('Manual');
@@ -189,6 +196,7 @@ export default function MainScreen({ sensors }) {
         trail={gpsTrail}
         selectedMission={selectedMission}
         setSelectedMission={setSelectedMission}
+        clearTrail={() => setGpsTrail([])}
       />
     );
   };

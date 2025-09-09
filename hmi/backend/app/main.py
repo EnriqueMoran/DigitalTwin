@@ -3,7 +3,7 @@ import json
 import os
 import time
 from datetime import datetime
-from math import atan2, cos, radians, sin, sqrt, pi, isfinite
+from math import atan2, cos, radians, sin, sqrt, pi, isfinite, degrees
 from pathlib import Path
 from typing import Dict, Any, Set
 
@@ -44,6 +44,9 @@ STATE: Dict[str, Any] = {
 LAST_MESSAGE_TIME: float | None = None
 # Track last time we received data from ESP32 (sensor/* topics)
 ESP32_LAST_MESSAGE_TIME: float | None = None
+# Per-sensor last times from ESP32 sensor/* topics only
+SENSOR_IMU_LAST_TIME: float | None = None
+SENSOR_GPS_LAST_TIME: float | None = None
 WEBSOCKETS: Set[WebSocket] = set()
 MQTT_CLIENT: mqtt.Client | None = None
 EVENT_LOOP: asyncio.AbstractEventLoop | None = None
@@ -138,10 +141,10 @@ def _on_connect(client: mqtt.Client, userdata, flags, rc):
 
 
 def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
-    global LAST_MESSAGE_TIME, ESP32_LAST_MESSAGE_TIME, _prev_gps, _prev_imu_ts, _est_velocity, _last_processed, _est_heading
+    global LAST_MESSAGE_TIME, ESP32_LAST_MESSAGE_TIME, SENSOR_IMU_LAST_TIME, SENSOR_GPS_LAST_TIME
+    global _prev_gps, _prev_imu_ts, _est_velocity, _last_processed, _est_heading
+    # Process every incoming message; broadcast loop already throttles WS output
     now = time.monotonic()
-    if now - _last_processed < 0.1:
-        return
     _last_processed = now
     topic = msg.topic
     try:
@@ -154,13 +157,16 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         # If this is a sensor/* GPS message, mark ESP32 last seen
         if topic == TOPIC_SENSOR_GPS:
             ESP32_LAST_MESSAGE_TIME = time.time()
+            SENSOR_GPS_LAST_TIME = ESP32_LAST_MESSAGE_TIME
         lat = payload.get("lat")
         lon = payload.get("lon")
         alt = payload.get("alt")
         spd_knots = payload.get("speed")
-        # Optional heading in degrees from GPS (mirror of COG).
+        # Optional heading and COG (degrees) from GPS. Use these when available
+        # to avoid noisy bearing estimates from position noise.
         # Convert to radians to keep internal units consistent.
         heading_deg = payload.get("heading")
+        cog_deg = payload.get("cog")
         ts = _parse_ts(payload.get("ts"))
         STATE["latitude"] = lat
         STATE["longitude"] = lon
@@ -174,11 +180,18 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
                 STATE["heading"] = radians(float(heading_deg))
             except Exception:
                 pass
+        if cog_deg is not None:
+            try:
+                STATE["cog"] = radians(float(cog_deg))
+            except Exception:
+                pass
+
         if _prev_gps:
             dt = ts - _prev_gps["ts"]
             if dt > 0:
                 dist = _haversine(_prev_gps["lat"], _prev_gps["lon"], lat, lon)
-                STATE["cog"] = _bearing(_prev_gps["lat"], _prev_gps["lon"], lat, lon)
+                if cog_deg is None:
+                    STATE["cog"] = _bearing(_prev_gps["lat"], _prev_gps["lon"], lat, lon)
                 if spd is None:
                     STATE["true_speed"] = dist / dt
         _prev_gps = {"lat": lat, "lon": lon, "ts": ts}
@@ -187,6 +200,7 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         # If this is a sensor/* IMU message, mark ESP32 last seen
         if topic == TOPIC_SENSOR_IMU:
             ESP32_LAST_MESSAGE_TIME = time.time()
+            SENSOR_IMU_LAST_TIME = ESP32_LAST_MESSAGE_TIME
         ax = payload.get("ax")
         ay = payload.get("ay")
         az = payload.get("az")
@@ -294,28 +308,21 @@ async def _broadcast_loop():
         now = time.monotonic()
         if now - _last_broadcast >= 0.1:
             _last_broadcast = now
-            # Determine ESP32 connectivity and set uptime based on it
+            # Service uptime should be monotonic and independent of ESP32 connectivity
             try:
-                # Consider ESP32 connected if we've seen sensor/* recently (<= 10s)
-                esp32_connected = False
-                if ESP32_LAST_MESSAGE_TIME is not None:
-                    esp32_connected = (time.time() - ESP32_LAST_MESSAGE_TIME) <= 10.0
-
-                if not esp32_connected:
-                    # Reset start marker and uptime if disconnected
-                    _esp32_start_monotonic = None  # type: ignore
-                    STATE["uptime"] = 0
-                else:
-                    # Initialize start time at first connection
-                    if _esp32_start_monotonic is None:
-                        _esp32_start_monotonic = time.monotonic()  # type: ignore
-                    STATE["uptime"] = int(max(0, time.monotonic() - (_esp32_start_monotonic or now)))
+                STATE["uptime"] = int(max(0, time.monotonic() - _service_start_monotonic))
             except Exception:
-                # Fallback: keep uptime at 0 on error
-                STATE["uptime"] = 0
+                pass
 
-            # Snapshot data to send
-            data = {"sensors": STATE, "last_message_time": LAST_MESSAGE_TIME}
+            # Snapshot data to send, include per-sensor last times from sensor/* only
+            data = {
+                "sensors": STATE,
+                "last_message_time": LAST_MESSAGE_TIME,
+                "sensor_last": {
+                    "imu": SENSOR_IMU_LAST_TIME,
+                    "gps": SENSOR_GPS_LAST_TIME,
+                },
+            }
 
             # Send concurrently to avoid one slow client blocking others
             sockets = list(WEBSOCKETS)
@@ -379,6 +386,12 @@ async def sim_imu(payload: Dict[str, Any]) -> Dict[str, str]:
                 h = -1.0
         except Exception:
             h = -1.0
+        # STATE["heading"] is stored in radians. IMU simulator expects degrees for baseline.
+        try:
+            if h >= 0:
+                h = float(degrees(h))
+        except Exception:
+            pass
         out = {**payload, "heading": h}
         MQTT_CLIENT.publish("land/imu", json.dumps(out))
     return {"status": "ok"}
