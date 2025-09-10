@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 from math import atan2, cos, radians, sin, sqrt, pi, isfinite, degrees
 from pathlib import Path
-from typing import Dict, Any, Set
+from typing import Dict, Any, Set, Optional
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,6 +40,18 @@ STATE: Dict[str, Any] = {
     "uptime": None,
     "radar_tracks": [],
 }
+
+# Explicit sensor and system state machines
+SENSOR_STATES: Dict[str, str] = {"imu": "Not initialized", "gps": "Not initialized"}
+SYSTEM_STATE: str = "Initializing"
+
+# Track validity from last real (sensor/*) message for each sensor
+_IMU_LAST_VALID: Optional[bool] = None
+_GPS_LAST_VALID: Optional[bool] = None
+
+# Baselines captured when simulation starts, to optionally restore on stop
+_BASELINE_STATE: Dict[str, Optional[str]] = {"imu": None, "gps": None}
+_BASELINE_LAST_TS: Dict[str, Optional[float]] = {"imu": None, "gps": None}
 
 LAST_MESSAGE_TIME: float | None = None
 # Track last time we received data from ESP32 (sensor/* topics)
@@ -156,6 +168,7 @@ def _on_connect(client: mqtt.Client, userdata, flags, rc):
 def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
     global LAST_MESSAGE_TIME, ESP32_LAST_MESSAGE_TIME, SENSOR_IMU_LAST_TIME, SENSOR_GPS_LAST_TIME
     global _prev_gps, _prev_imu_ts, _est_velocity, _last_processed, _est_heading
+    global _IMU_LAST_VALID, _GPS_LAST_VALID, SENSOR_STATES
     # Process every incoming message; broadcast loop already throttles WS output
     now = time.monotonic()
     _last_processed = now
@@ -211,6 +224,16 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
                 if spd is None:
                     STATE["true_speed"] = dist / dt
         _prev_gps = {"lat": lat, "lon": lon, "ts": ts}
+
+        # Update GPS sensor state/validity only for real sensor data
+        if topic == TOPIC_SENSOR_GPS:
+            valid = (
+                lat is not None and lon is not None and
+                isinstance(lat, (int, float)) and isinstance(lon, (int, float)) and
+                isfinite(float(lat)) and isfinite(float(lon))
+            )
+            _GPS_LAST_VALID = valid
+            SENSOR_STATES["gps"] = "Running" if valid else "Degraded"
 
     elif topic in (TOPIC_SENSOR_IMU, TOPIC_SIM_IMU):
         # Gate IMU source similarly
@@ -287,6 +310,16 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
                 pass
         STATE["latency"] = LAST_MESSAGE_TIME - ts
 
+        # Update IMU sensor state/validity only for real sensor data
+        if topic == TOPIC_SENSOR_IMU:
+            valid_vals = [ax, ay, az, gx, gy, gz]
+            valid = all(
+                (v is not None and isinstance(v, (int, float)) and isfinite(float(v)))
+                for v in valid_vals
+            )
+            _IMU_LAST_VALID = valid
+            SENSOR_STATES["imu"] = "Running" if valid else "Degraded"
+
     elif topic in (TOPIC_SENSOR_BATTERY, TOPIC_SIM_BATTERY):
         # If this is a sensor/* Battery message, mark ESP32 last seen
         if topic == TOPIC_SENSOR_BATTERY:
@@ -332,7 +365,7 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
             ]
 
 async def _broadcast_loop():
-    global _last_broadcast, _esp32_start_monotonic
+    global _last_broadcast, _esp32_start_monotonic, SYSTEM_STATE
     while True:
         now = time.monotonic()
         if now - _last_broadcast >= 0.1:
@@ -343,10 +376,50 @@ async def _broadcast_loop():
             except Exception:
                 pass
 
+            # Update time-based availability for sensors when not simulated
+            now_sec = time.time()
+            if not SIM_IMU_ACTIVE:
+                if SENSOR_IMU_LAST_TIME is None:
+                    # Remains Not initialized until first real data arrives
+                    pass
+                elif now_sec - SENSOR_IMU_LAST_TIME > 10:
+                    SENSOR_STATES["imu"] = "Unavailable"
+            else:
+                SENSOR_STATES["imu"] = "Simulated"
+
+            if not SIM_GPS_ACTIVE:
+                if SENSOR_GPS_LAST_TIME is None:
+                    pass
+                elif now_sec - SENSOR_GPS_LAST_TIME > 10:
+                    SENSOR_STATES["gps"] = "Unavailable"
+            else:
+                SENSOR_STATES["gps"] = "Simulated"
+
+            # Compute system state
+            if SIM_IMU_ACTIVE or SIM_GPS_ACTIVE:
+                SYSTEM_STATE = "Simulation"
+            else:
+                imu_state = SENSOR_STATES.get("imu", "Not initialized")
+                gps_state = SENSOR_STATES.get("gps", "Not initialized")
+                both_not_init = imu_state == "Not initialized" and gps_state == "Not initialized"
+                both_running = imu_state == "Running" and gps_state == "Running"
+                if both_not_init:
+                    SYSTEM_STATE = "Initializing"
+                elif both_running:
+                    SYSTEM_STATE = "OK"
+                else:
+                    # As long as not both Not initialized
+                    SYSTEM_STATE = "Degraded"
+
             # Snapshot data to send, include per-sensor last times from sensor/* only
             data = {
                 "sensors": STATE,
                 "last_message_time": LAST_MESSAGE_TIME,
+                "system_state": SYSTEM_STATE,
+                "sensor_states": {
+                    "imu": SENSOR_STATES.get("imu"),
+                    "gps": SENSOR_STATES.get("gps"),
+                },
                 "sensor_last": {
                     "imu": SENSOR_IMU_LAST_TIME,
                     "gps": SENSOR_GPS_LAST_TIME,
@@ -407,7 +480,7 @@ async def health() -> Dict[str, str]:
 
 @app.post("/sim/imu")
 async def sim_imu(payload: Dict[str, Any]) -> Dict[str, str]:
-    global SIM_IMU_ACTIVE
+    global SIM_IMU_ACTIVE, SENSOR_STATES, _BASELINE_STATE, _BASELINE_LAST_TS
     # Update IMU simulation state based on control flag (if provided)
     try:
         ctrl_raw = payload.get("control")
@@ -415,8 +488,26 @@ async def sim_imu(payload: Dict[str, Any]) -> Dict[str, str]:
             ctrl = ctrl_raw.strip().upper()
             if ctrl == "START":
                 SIM_IMU_ACTIVE = True
+                # Capture baseline to restore later
+                _BASELINE_STATE["imu"] = SENSOR_STATES.get("imu")
+                _BASELINE_LAST_TS["imu"] = SENSOR_IMU_LAST_TIME
+                SENSOR_STATES["imu"] = "Simulated"
             elif ctrl == "STOP":
                 SIM_IMU_ACTIVE = False
+                # Restore logical state based on whether new real data arrived
+                base_ts = _BASELINE_LAST_TS.get("imu")
+                last_ts = SENSOR_IMU_LAST_TIME
+                now_sec = time.time()
+                if last_ts is None:
+                    SENSOR_STATES["imu"] = "Not initialized"
+                elif base_ts is not None and last_ts == base_ts:
+                    # No new data since sim started; restore previous baseline
+                    SENSOR_STATES["imu"] = _BASELINE_STATE.get("imu") or "Not initialized"
+                else:
+                    if now_sec - last_ts > 10:
+                        SENSOR_STATES["imu"] = "Unavailable"
+                    else:
+                        SENSOR_STATES["imu"] = "Running" if _IMU_LAST_VALID else "Degraded"
     except Exception:
         pass
     if MQTT_CLIENT:
@@ -440,7 +531,7 @@ async def sim_imu(payload: Dict[str, Any]) -> Dict[str, str]:
 
 @app.post("/sim/gps")
 async def sim_gps(payload: Dict[str, Any]) -> Dict[str, str]:
-    global SIM_GPS_ACTIVE
+    global SIM_GPS_ACTIVE, SENSOR_STATES, _BASELINE_STATE, _BASELINE_LAST_TS
     # Update GPS simulation state based on control flag
     try:
         ctrl_raw = payload.get("control")
@@ -448,8 +539,23 @@ async def sim_gps(payload: Dict[str, Any]) -> Dict[str, str]:
             ctrl = ctrl_raw.strip().upper()
             if ctrl in ("VECTOR", "ROUTE"):
                 SIM_GPS_ACTIVE = True
+                _BASELINE_STATE["gps"] = SENSOR_STATES.get("gps")
+                _BASELINE_LAST_TS["gps"] = SENSOR_GPS_LAST_TIME
+                SENSOR_STATES["gps"] = "Simulated"
             elif ctrl == "STOP":
                 SIM_GPS_ACTIVE = False
+                base_ts = _BASELINE_LAST_TS.get("gps")
+                last_ts = SENSOR_GPS_LAST_TIME
+                now_sec = time.time()
+                if last_ts is None:
+                    SENSOR_STATES["gps"] = "Not initialized"
+                elif base_ts is not None and last_ts == base_ts:
+                    SENSOR_STATES["gps"] = _BASELINE_STATE.get("gps") or "Not initialized"
+                else:
+                    if now_sec - last_ts > 10:
+                        SENSOR_STATES["gps"] = "Unavailable"
+                    else:
+                        SENSOR_STATES["gps"] = "Running" if _GPS_LAST_VALID else "Degraded"
     except Exception:
         pass
     if MQTT_CLIENT:

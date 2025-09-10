@@ -73,6 +73,12 @@ export default function SystemStatus({ sensors = {} }) {
     return `${val}${unit}`;
   };
   const toFixed = (d) => (v) => Number(v).toFixed(d);
+  const fmtLocalTime = (ts) => {
+    if (ts == null) return null;
+    const date = new Date(Number(ts) * 1000);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleTimeString();
+  };
   // Connection display: do not show last message time here; the banner already shows it
   const connectionDisplay = sensors.connection_state ?? 'Unavaliable';
 
@@ -121,8 +127,28 @@ export default function SystemStatus({ sensors = {} }) {
   const sensorsSection = {
     title: 'Sensors',
     rows: [
-      ['IMU', fmt(sensors.imu_state)],
-      ['GPS', fmt(sensors.gps_state)],
+      [
+        'IMU',
+        (() => {
+          const base = sensors.imu_state;
+          if (base === 'Unavailable') {
+            const t = fmtLocalTime(sensors.last_imu_time);
+            return t ? `Unavailable (${t})` : 'Unavailable';
+          }
+          return fmt(base);
+        })(),
+      ],
+      [
+        'GPS',
+        (() => {
+          const base = sensors.gps_state;
+          if (base === 'Unavailable') {
+            const t = fmtLocalTime(sensors.last_gps_time);
+            return t ? `Unavailable (${t})` : 'Unavailable';
+          }
+          return fmt(base);
+        })(),
+      ],
     ],
   };
 
