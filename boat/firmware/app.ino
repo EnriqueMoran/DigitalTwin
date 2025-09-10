@@ -10,7 +10,7 @@
 // -------- Wi-Fi / MQTT --------
 #define WIFI_SSID  ""
 #define WIFI_PASS  ""
-#define MQTT_HOST  "192.168.1.103"
+#define MQTT_HOST  "192.168.1.0"
 #define MQTT_PORT  1883
 #define TOPIC_IMU  "sensor/imu"
 #define TOPIC_GPS  "sensor/gps"
@@ -28,14 +28,19 @@
 const uint32_t IMU_PERIOD_MS = 10;   // 100 Hz
 // GPS_PERIOD_MS = 0 -> publish as sentences arrive (no throttle)
 // GPS_PERIOD_MS > 0 -> fixed-rate publish using last decoded data
-uint32_t GPS_PERIOD_MS = 0;          // change to e.g. 200 for ~5 Hz
+uint32_t GPS_PERIOD_MS = 0;
 
 // -------- IMU mag calibration --------
 struct MagCal { float offsetX, offsetY, offsetZ, scaleX, scaleY, scaleZ; };
-MagCal MAG = { -496.01975f, -53.24005f, 237.72351f, 0.7359803f, 1.0322434f, 1.4869797f };
+MagCal MAG = { -43.479370f, 7.986023f, -168.458771f, 1.050293f, 0.997966f, 0.956163f };
 
 const float DECLINATION_RAD = 0.0f;
-const float YAW_ALPHA = 0.98f;
+// Complementary filter time constant for yaw (seconds).
+// Lower values => stronger magnetometer correction (faster pull to North).
+// Example at 100 Hz (dt≈0.01s):
+//   YAW_TAU_S=0.05 -> alpha≈0.83 (≈17% magnetometer)
+//   YAW_TAU_S=0.02 -> alpha≈0.67 (≈33% magnetometer)
+const float YAW_TAU_S = 0.05f;
 
 MPU9250 mpu;
 WiFiClient net;
@@ -67,9 +72,15 @@ String iso8601_utc(time_t t){
 void wifiConnect(){
   WiFi.mode(WIFI_STA); WiFi.begin(WIFI_SSID, WIFI_PASS);
   while (WiFi.status()!=WL_CONNECTED) delay(300);
+  // Keep radio awake to avoid packet bursts caused by power-save batching
+  WiFi.setSleep(false);
 }
 void mqttConnect(){
   mqtt.setServer(MQTT_HOST, MQTT_PORT);
+  // Tuning to reduce blocking and handle larger JSON payloads smoothly
+  mqtt.setKeepAlive(20);
+  mqtt.setSocketTimeout(1);
+  mqtt.setBufferSize(1024);
   while(!mqtt.connected()){
     String cid = "esp32-imu-" + String((uint32_t)ESP.getEfuseMac(), HEX);
     mqtt.connect(cid.c_str());
@@ -126,7 +137,10 @@ void publishIMU(){
   else{
     float yaw_gyro = wrap_2pi(yaw_fused + (-gz)*dt);
     float e = wrap_pi(heading_tc - yaw_gyro);
-    yaw_fused = wrap_2pi(yaw_gyro + (1.0f - YAW_ALPHA)*e);
+    // Compute complementary filter alpha from desired time constant
+    float alpha = YAW_TAU_S / (YAW_TAU_S + dt);
+    if(alpha < 0.0f) alpha = 0.0f; if(alpha > 1.0f) alpha = 1.0f;
+    yaw_fused = wrap_2pi(yaw_gyro + (1.0f - alpha)*e);
   }
 
   String ts = iso8601_utc(time(nullptr));
@@ -140,7 +154,11 @@ void publishIMU(){
   doc["ts"]=ts; doc["seq"]=seq++; doc["rate_hz"]=100;
 
   char payload[640]; size_t n=serializeJson(doc,payload,sizeof(payload));
-  mqtt.publish(TOPIC_IMU,(const uint8_t*)payload,n,false);
+  // Stream publish to avoid reliance on PubSubClient internal buffer
+  if (mqtt.beginPublish(TOPIC_IMU, n, false)) {
+    mqtt.write((const uint8_t*)payload, n);
+    mqtt.endPublish();
+  }
 }
 
 // -------- GPS helpers --------
@@ -176,7 +194,10 @@ void publishGPS_payload(){
   if(GC.dopValid) doc["hdop"]=GC.hdop;
 
   char payload[512]; size_t n=serializeJson(doc,payload,sizeof(payload));
-  mqtt.publish(TOPIC_GPS,(const uint8_t*)payload,n,false);
+  if (mqtt.beginPublish(TOPIC_GPS, n, false)) {
+    mqtt.write((const uint8_t*)payload, n);
+    mqtt.endPublish();
+  }
 }
 
 // -------- GPS publisher policies --------

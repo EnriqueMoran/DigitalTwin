@@ -50,7 +50,6 @@ export default function BoatViewer({ sensors }) {
         modelRef.current = gltf.scene;
         scene.add(modelRef.current);
         modelRef.current.rotation.order = 'ZXY';
-        modelRef.current.rotateY(Math.PI / 2);
 
         const box = new THREE.Box3().setFromObject(gltf.scene);
         const center = box.getCenter(new THREE.Vector3());
@@ -79,12 +78,19 @@ export default function BoatViewer({ sensors }) {
       }
     );
 
+    // Offset so that:
+    // - Heading North (0 rad) => we see the stern (bow points away from camera)
+    // - Heading South (pi rad) => we see the bow (bow points towards camera)
+    // This is achieved by adding 180° to the previous compass-aligned mapping.
+    const HEADING_OFFSET = Math.PI / 2 + Math.PI; // +90° + 180°
+
     function animate() {
       requestAnimationFrame(animate);
       if (liveRef.current && sensorsRef.current && modelRef.current) {
         const { roll = 0, pitch = 0, heading = 0 } = sensorsRef.current;
         let rx = pitch || 0;
-        let ry = -(heading || 0);
+        // Align yaw with compass (0=N, CW positive) and model forward axis
+        let ry = -(heading || 0) + HEADING_OFFSET;
         let rz = -(roll || 0);
         const mode = axisModeRef.current;
         if (mode === 'x') {

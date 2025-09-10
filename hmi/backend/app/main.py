@@ -56,6 +56,15 @@ _service_start_monotonic: float = time.monotonic()
 _last_processed: float = 0.0
 _esp32_start_monotonic: float | None = None
 
+# Simulation gating flags: when True, ignore real sensor/* for that sensor
+SIM_GPS_ACTIVE: bool = False
+SIM_IMU_ACTIVE: bool = False
+
+# Fixed heading offset for real IMU (sensor/*), radians
+IMU_HEADING_OFFSET_RAD: float = - (pi / 2)  # -90 degrees
+# Mirror E/W for real IMU if sensor axes produce opposite yaw handedness
+IMU_MIRROR_EAST_WEST: bool = True
+
 MQTT_HOST = os.getenv("MQTT_HOST", "mosquitto")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
@@ -135,6 +144,10 @@ def _bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return (b + 2 * 3.141592653589793) % (2 * 3.141592653589793)
 
 
+def _wrap2pi(a: float) -> float:
+    return a % (2 * pi)
+
+
 def _on_connect(client: mqtt.Client, userdata, flags, rc):
     for t in SENSOR_TOPICS + LEGACY_TOPICS + PROCESSED_TOPICS:
         client.subscribe(t)
@@ -154,6 +167,9 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
     LAST_MESSAGE_TIME = time.time()
 
     if topic in (TOPIC_SENSOR_GPS, TOPIC_SIM_GPS):
+        # Gate GPS source: when sim active, ignore real sensor/*; when not active, ignore sim/*
+        if (topic == TOPIC_SENSOR_GPS and SIM_GPS_ACTIVE) or (topic == TOPIC_SIM_GPS and not SIM_GPS_ACTIVE):
+            return
         # If this is a sensor/* GPS message, mark ESP32 last seen
         if topic == TOPIC_SENSOR_GPS:
             ESP32_LAST_MESSAGE_TIME = time.time()
@@ -197,6 +213,9 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         _prev_gps = {"lat": lat, "lon": lon, "ts": ts}
 
     elif topic in (TOPIC_SENSOR_IMU, TOPIC_SIM_IMU):
+        # Gate IMU source similarly
+        if (topic == TOPIC_SENSOR_IMU and SIM_IMU_ACTIVE) or (topic == TOPIC_SIM_IMU and not SIM_IMU_ACTIVE):
+            return
         # If this is a sensor/* IMU message, mark ESP32 last seen
         if topic == TOPIC_SENSOR_IMU:
             ESP32_LAST_MESSAGE_TIME = time.time()
@@ -256,6 +275,16 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
             STATE["heading"] = heading_tc % (2 * pi)
         else:
             STATE["heading"] = _est_heading
+
+        # Apply heading corrections only for real IMU messages
+        if topic == TOPIC_SENSOR_IMU and STATE["heading"] is not None:
+            try:
+                h = _wrap2pi(STATE["heading"] + IMU_HEADING_OFFSET_RAD)
+                if IMU_MIRROR_EAST_WEST:
+                    h = _wrap2pi(-h)  # swap E/W while keeping N/S
+                STATE["heading"] = h
+            except Exception:
+                pass
         STATE["latency"] = LAST_MESSAGE_TIME - ts
 
     elif topic in (TOPIC_SENSOR_BATTERY, TOPIC_SIM_BATTERY):
@@ -378,6 +407,18 @@ async def health() -> Dict[str, str]:
 
 @app.post("/sim/imu")
 async def sim_imu(payload: Dict[str, Any]) -> Dict[str, str]:
+    global SIM_IMU_ACTIVE
+    # Update IMU simulation state based on control flag (if provided)
+    try:
+        ctrl_raw = payload.get("control")
+        if isinstance(ctrl_raw, str):
+            ctrl = ctrl_raw.strip().upper()
+            if ctrl == "START":
+                SIM_IMU_ACTIVE = True
+            elif ctrl == "STOP":
+                SIM_IMU_ACTIVE = False
+    except Exception:
+        pass
     if MQTT_CLIENT:
         heading = STATE.get("heading")
         try:
@@ -399,6 +440,18 @@ async def sim_imu(payload: Dict[str, Any]) -> Dict[str, str]:
 
 @app.post("/sim/gps")
 async def sim_gps(payload: Dict[str, Any]) -> Dict[str, str]:
+    global SIM_GPS_ACTIVE
+    # Update GPS simulation state based on control flag
+    try:
+        ctrl_raw = payload.get("control")
+        if isinstance(ctrl_raw, str):
+            ctrl = ctrl_raw.strip().upper()
+            if ctrl in ("VECTOR", "ROUTE"):
+                SIM_GPS_ACTIVE = True
+            elif ctrl == "STOP":
+                SIM_GPS_ACTIVE = False
+    except Exception:
+        pass
     if MQTT_CLIENT:
         MQTT_CLIENT.publish("land/gps", json.dumps(payload))
         # Also update IMU baseline heading so it can simulate small yaw variations.
