@@ -282,7 +282,23 @@ export default function SimulationManager({ missions = {}, sensors = {}, clearTr
       <div className="sim-section">
         <h3>GPS Simulation</h3>
         <div>
-          <select value={routeName} onChange={(e) => setSimState({ routeName: e.target.value })}>
+          <select
+            value={routeName}
+            onChange={(e) => {
+              const name = e.target.value;
+              const patch = { routeName: name };
+              const pts = missions[name];
+              if (Array.isArray(pts) && pts.length > 0) {
+                const lat0 = Number(pts[0].lat);
+                const lon0 = Number(pts[0].lon);
+                if (Number.isFinite(lat0) && Number.isFinite(lon0)) {
+                  patch.gpsLat = String(lat0);
+                  patch.gpsLon = String(lon0);
+                }
+              }
+              setSimState(patch);
+            }}
+          >
             <option value="">Select route</option>
             {missionNames.map((name) => (
               <option key={name} value={name}>

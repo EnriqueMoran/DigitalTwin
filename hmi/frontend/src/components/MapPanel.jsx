@@ -59,6 +59,7 @@ export default function MapPanel({
   currentMission,
   currentWpIdx = 0,
   trail = [],
+  clearTrail = () => {},
 }) {
   const mapRef = useRef(null);
   const markerRef = useRef(null);
@@ -262,6 +263,9 @@ export default function MapPanel({
         </button>
         <button onClick={() => setShowMission((s) => !s)} disabled={!selectedMission}>
           Mission points
+        </button>
+        <button onClick={clearTrail} disabled={(trail?.length || 0) === 0}>
+          Clear trail
         </button>
       </div>
       {contextMenu && (

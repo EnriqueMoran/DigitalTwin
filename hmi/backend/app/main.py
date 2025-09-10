@@ -36,7 +36,16 @@ STATE: Dict[str, Any] = {
     "imu_temperature": None,
     "latency": None,
     "battery_status": None,
+    # GPS & connectivity
     "gps_signal": None,
+    "gps_fix_quality": None,
+    "hdop": None,
+    "sats_used": None,
+    "sats_in_view": None,
+    "avg_snr": None,
+    # WiFi
+    "wifi_quality": None,
+    "wifi_rssi": None,
     "uptime": None,
     "radar_tracks": [],
 }
@@ -133,8 +142,12 @@ def _parse_ts(ts: str | None) -> float:
     if not ts:
         return time.time()
     try:
-        return datetime.fromisoformat(ts).timestamp()
-    except ValueError:
+        s = str(ts)
+        # Support trailing 'Z' (UTC) by converting to +00:00 offset for fromisoformat
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        return datetime.fromisoformat(s).timestamp()
+    except Exception:
         return time.time()
 
 
@@ -200,10 +213,30 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         STATE["latitude"] = lat
         STATE["longitude"] = lon
         STATE["altitude"] = alt
+        # GPS signal metadata
         STATE["gps_signal"] = payload.get("fix")
+        STATE["gps_fix_quality"] = payload.get("fix")
+        if (hd := payload.get("hdop")) is not None:
+            try:
+                STATE["hdop"] = float(hd)
+            except Exception:
+                pass
+        if (su := payload.get("sats_used")) is not None:
+            try:
+                STATE["sats_used"] = int(su)
+            except Exception:
+                pass
+        if (sv := payload.get("sats_in_view")) is not None:
+            try:
+                STATE["sats_in_view"] = int(sv)
+            except Exception:
+                pass
         spd = spd_knots * 0.514444 if spd_knots is not None else None
         STATE["true_speed"] = spd
-        STATE["latency"] = LAST_MESSAGE_TIME - ts
+        try:
+            STATE["latency"] = max(0.0, float(LAST_MESSAGE_TIME - ts))
+        except Exception:
+            pass
         if heading_deg is not None:
             try:
                 STATE["heading"] = radians(float(heading_deg))
@@ -227,11 +260,19 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
 
         # Update GPS sensor state/validity only for real sensor data
         if topic == TOPIC_SENSOR_GPS:
-            valid = (
-                lat is not None and lon is not None and
-                isinstance(lat, (int, float)) and isinstance(lon, (int, float)) and
-                isfinite(float(lat)) and isfinite(float(lon))
-            )
+            # Valid when lat/lon are finite and non-zero AND required metadata present
+            def _is_num(x):
+                try:
+                    return isinstance(x, (int, float)) and isfinite(float(x))
+                except Exception:
+                    return False
+            lat_ok = _is_num(lat) and float(lat) != 0.0
+            lon_ok = _is_num(lon) and float(lon) != 0.0
+            have_fix = (payload.get("fix") is not None)
+            have_hdop = (payload.get("hdop") is not None)
+            have_su = (payload.get("sats_used") is not None)
+            # 'sats_in_view' is optional; ignore for validity
+            valid = lat_ok and lon_ok and have_fix and have_hdop and have_su
             _GPS_LAST_VALID = valid
             SENSOR_STATES["gps"] = "Running" if valid else "Degraded"
 
@@ -308,7 +349,10 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
                 STATE["heading"] = h
             except Exception:
                 pass
-        STATE["latency"] = LAST_MESSAGE_TIME - ts
+        try:
+            STATE["latency"] = max(0.0, float(LAST_MESSAGE_TIME - ts))
+        except Exception:
+            pass
 
         # Update IMU sensor state/validity only for real sensor data
         if topic == TOPIC_SENSOR_IMU:
@@ -330,10 +374,21 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
                 soc *= 100.0
             STATE["battery_status"] = soc
         ts = _parse_ts(payload.get("ts"))
-        STATE["latency"] = LAST_MESSAGE_TIME - ts
+        try:
+            STATE["latency"] = max(0.0, float(LAST_MESSAGE_TIME - ts))
+        except Exception:
+            pass
 
     elif topic == "sensor/status":
         ts = _parse_ts(payload.get("ts"))
+        # WiFi signal
+        try:
+            STATE["wifi_rssi"] = int(payload.get("wifi_rssi"))
+        except Exception:
+            pass
+        wq = payload.get("wifi_quality")
+        if isinstance(wq, str):
+            STATE["wifi_quality"] = wq
         STATE["latency"] = LAST_MESSAGE_TIME - ts
 
     elif TOPIC_SENSOR_TRACK and topic == TOPIC_SENSOR_TRACK:
@@ -399,17 +454,21 @@ async def _broadcast_loop():
             if SIM_IMU_ACTIVE or SIM_GPS_ACTIVE:
                 SYSTEM_STATE = "Simulation"
             else:
-                imu_state = SENSOR_STATES.get("imu", "Not initialized")
-                gps_state = SENSOR_STATES.get("gps", "Not initialized")
-                both_not_init = imu_state == "Not initialized" and gps_state == "Not initialized"
-                both_running = imu_state == "Running" and gps_state == "Running"
-                if both_not_init:
-                    SYSTEM_STATE = "Initializing"
-                elif both_running:
-                    SYSTEM_STATE = "OK"
+                # If ESP32 connectivity lost for >10s (after having seen it), mark system Unavailable
+                if ESP32_LAST_MESSAGE_TIME is not None and (now_sec - ESP32_LAST_MESSAGE_TIME > 10):
+                    SYSTEM_STATE = "Unavailable"
                 else:
-                    # As long as not both Not initialized
-                    SYSTEM_STATE = "Degraded"
+                    imu_state = SENSOR_STATES.get("imu", "Not initialized")
+                    gps_state = SENSOR_STATES.get("gps", "Not initialized")
+                    both_not_init = imu_state == "Not initialized" and gps_state == "Not initialized"
+                    both_running = imu_state == "Running" and gps_state == "Running"
+                    if both_not_init:
+                        SYSTEM_STATE = "Initializing"
+                    elif both_running:
+                        SYSTEM_STATE = "OK"
+                    else:
+                        # As long as not both Not initialized
+                        SYSTEM_STATE = "Degraded"
 
             # Snapshot data to send, include per-sensor last times from sensor/* only
             data = {

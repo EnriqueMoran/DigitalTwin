@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 function clamp(x, lo, hi) {
   return Math.max(lo, Math.min(hi, x));
@@ -40,8 +40,8 @@ function score_sat_used(sats_used, ceiling = 12) {
 }
 
 function score_efficiency(sats_used, sats_in_view) {
-  if (!sats_used || !sats_in_view || sats_in_view <= 0) return 50;
-  return clamp((sats_used / sats_in_view) * 100.0, 0, 100);
+  // Deprecated: efficiency uses sats_in_view, which we now ignore in UI
+  return 50;
 }
 
 function gps_quality_percent(quality, gsa_mode, hdop, avg_snr, sats_used, sats_in_view) {
@@ -50,10 +50,10 @@ function gps_quality_percent(quality, gsa_mode, hdop, avg_snr, sats_used, sats_i
   const hd = score_hdop(hdop);
   const sn = score_snr(avg_snr);
   const su = score_sat_used(sats_used);
-  const ef = score_efficiency(sats_used, sats_in_view);
-  const total = 0.35 * fix + 0.25 * hd + 0.2 * sn + 0.15 * su + 0.05 * ef;
+  // Drop efficiency weight; rebalance to emphasize fix/hdop
+  const total = 0.45 * fix + 0.30 * hd + 0.15 * sn + 0.10 * su;
   let capped = total;
-  if ((sats_used || 0) === 0 || (sats_in_view || 0) === 0 || (hdop || 99) >= 99) capped = Math.min(total, 20.0);
+  if ((sats_used || 0) === 0 || (hdop || 99) >= 99) capped = Math.min(total, 20.0);
   return Number(capped.toFixed(1));
 }
 
@@ -67,6 +67,11 @@ function formatHHMMSS(s) {
 }
 
 export default function SystemStatus({ sensors = {} }) {
+  const [nowTime, setNowTime] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNowTime(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
   const fmt = (v, unit = '', transform) => {
     if (v === undefined || v === null) return 'Unavaliable';
     const val = transform ? transform(v) : v;
@@ -90,11 +95,16 @@ export default function SystemStatus({ sensors = {} }) {
     sensors.sats_used,
     sensors.sats_in_view
   );
+  const hasQualityInputs =
+    sensors.gps_fix_quality != null &&
+    sensors.hdop != null &&
+    sensors.sats_used != null;
 
   const fixText = (() => {
     const q = sensors.gps_fix_quality;
     const m = sensors.gsa_mode;
     if (q === 0 || m === 1) return 'NO FIX';
+    if (q === 1) return 'GNSS';
     if (q === 4) return 'RTK FIX';
     if (q === 5) return 'RTK FLOAT';
     if (q === 2) return 'DGPS';
@@ -120,7 +130,7 @@ export default function SystemStatus({ sensors = {} }) {
       ['Connection State', connectionDisplay],
       ['Mode', fmt(sensors.mode)],
       ['Latency (s)', fmt(sensors.latency, '', toFixed(3))],
-      ['Uptime (HH:MM:SS)', fmt(sensors.uptime, '', formatHHMMSS)],
+      ['Uptime', fmt(sensors.uptime, '', formatHHMMSS)],
     ],
   };
 
@@ -152,24 +162,36 @@ export default function SystemStatus({ sensors = {} }) {
     ],
   };
 
+  const wifiQualityText = (() => {
+    const given = sensors.wifi_quality || sensors.wifi_signal;
+    if (typeof given === 'string') return given;
+    const rssi = sensors.wifi_rssi;
+    if (rssi == null) return 'Unavaliable';
+    if (rssi >= -55) return 'Excellent';
+    if (rssi >= -65) return 'High';
+    if (rssi >= -72) return 'Medium';
+    if (rssi >= -82) return 'Poor';
+    return 'Unavaliable';
+  })();
+
   const battery = {
-    title: 'Battery',
+    title: 'Others',
     rows: [
-      ['Main battery (%)', 'Unavailable'],
-      ['Engine battery (%)', 'Unavailable'],
+      ['Current time', nowTime.toLocaleTimeString()],
+      ['Wifi Signal', wifiQualityText],
+      ['Main Battery', 'Unavaliable'],
+      ['Engine Battery', 'Unavaliable'],
     ],
   };
 
   const gps = {
     title: 'GPS',
     rows: [
-      ['Estimated Quality (%)', fmt(quality, '%')],
+      ['Estimated Quality', hasQualityInputs ? fmt(quality, '%') : 'Unavaliable'],
       ['Fix', fixText],
       [
-        'Satellites Used/Available',
-        sensors.sats_used != null || sensors.sats_in_view != null
-          ? `${sensors.sats_used || 0}/${sensors.sats_in_view || 0}`
-          : 'Unavaliable',
+        'Satellites Used',
+        sensors.sats_used != null ? `${sensors.sats_used}` : 'Unavaliable',
       ],
       ['Precision', precisionText],
     ],

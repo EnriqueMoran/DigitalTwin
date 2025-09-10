@@ -69,7 +69,14 @@ function App() {
       Simulation: 'blue',
       'Not initialized': 'yellow',
     }[effectiveConnection] || 'red';
-  const connectionDisplay = effectiveConnection;
+  let connectionDisplay = effectiveConnection;
+  if (effectiveConnection === 'Unavailable') {
+    const lastEsp = Math.max(Number(status.lastImu || 0), Number(status.lastGps || 0));
+    if (lastEsp > 0) {
+      const t = new Date(lastEsp * 1000).toLocaleTimeString();
+      connectionDisplay = `Unavailable (Last message: ${t})`;
+    }
+  }
 
   return (
     <>

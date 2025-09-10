@@ -12,8 +12,9 @@
 #define WIFI_PASS  ""
 #define MQTT_HOST  "192.168.1.0"
 #define MQTT_PORT  1883
-#define TOPIC_IMU  "sensor/imu"
-#define TOPIC_GPS  "sensor/gps"
+#define TOPIC_IMU     "sensor/imu"
+#define TOPIC_GPS     "sensor/gps"
+#define TOPIC_STATUS  "sensor/status"
 
 // -------- I2C / IMU --------
 #define SDA_PIN 8
@@ -51,6 +52,7 @@ TinyGPSPlus gps;
 uint32_t seq = 0;
 uint32_t lastImuSendMs = 0;
 uint32_t lastGpsSendMs = 0;
+uint32_t lastStatusSendMs = 0;
 
 bool yaw_init = false;
 float yaw_fused = 0.0f;
@@ -192,6 +194,10 @@ void publishGPS_payload(){
   if(GC.spdValid) doc["speed"]=GC.sog_kn;  // knots
   if(GC.crsValid) doc["cog"]=GC.cog_deg;   // degrees
   if(GC.dopValid) doc["hdop"]=GC.hdop;
+  // Satellites used (from GGA). Satellites in view (from GSV) not available here.
+  if(GC.sats>0) doc["sats_used"]=GC.sats;
+  // Provide a coarse fix quality: 0=no fix, 1=GNSS fix. We don't infer DGPS/RTK here.
+  doc["fix"] = GC.locValid ? 1 : 0;
 
   char payload[512]; size_t n=serializeJson(doc,payload,sizeof(payload));
   if (mqtt.beginPublish(TOPIC_GPS, n, false)) {
@@ -249,4 +255,29 @@ void loop(){
 
   // Cooperative yield; does not throttle scheduled publishing
   delay(1);
+
+  // Periodic status (WiFi) publish ~ 1 Hz
+  uint32_t now2 = millis();
+  if(now2 - lastStatusSendMs >= 1000){
+    lastStatusSendMs = now2;
+    long rssi = (WiFi.status()==WL_CONNECTED) ? WiFi.RSSI() : -127;
+    const char* qual = "Unavailable";
+    if(WiFi.status()==WL_CONNECTED){
+      if(rssi >= -55) qual = "Excellent";
+      else if(rssi >= -65) qual = "High";
+      else if(rssi >= -72) qual = "Medium";
+      else if(rssi >= -82) qual = "Poor";
+      else qual = "Unavailable";
+    }
+    String ts = iso8601_utc(time(nullptr));
+    StaticJsonDocument<192> doc;
+    doc["ts"] = ts;
+    doc["wifi_rssi"] = rssi;  // dBm
+    doc["wifi_quality"] = qual; // Unavailable|Poor|Medium|High|Excellent
+    char payload[256]; size_t n=serializeJson(doc,payload,sizeof(payload));
+    if (mqtt.beginPublish(TOPIC_STATUS, n, false)) {
+      mqtt.write((const uint8_t*)payload, n);
+      mqtt.endPublish();
+    }
+  }
 }

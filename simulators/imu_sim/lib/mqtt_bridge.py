@@ -54,6 +54,16 @@ class IMUPublisher:
         self._disable_yaw = True
         self._active = False
         self._sim_start = 0.0
+        # Heading convention for simulator vs HMI:
+        # - The backend computes heading from the magnetometer using atan2(my, mx)
+        #   (after tilt compensation) and DOES NOT apply any extra offsets to
+        #   simulated IMU messages (it only corrects real sensor/imu topics).
+        # - Therefore, to have HDG from the IMU sim match the GPS simulator COG/HDG,
+        #   the simulator must rotate the world field by the same yaw angle that we
+        #   want to display as heading (no mirroring, no +90° offset).
+        # Any additional alignment would introduce constant 90°/sign errors.
+        self._align_mirror_east_west = False
+        self._align_offset_deg = 0.0
 
     def _load_mqtt_config(self) -> None:
         import configparser
@@ -268,7 +278,13 @@ class IMUPublisher:
             base_heading_deg = float(self._base_heading_deg)
             yaw_wave_amp_deg = max(0.2, amp * 0.03)
         yaw_wave = yaw_wave_amp_deg * np.sin(2.0 * np.pi * freq * t + np.pi / 3.0)
-        yaw_deg = base_heading_deg + yaw_wave + yaw_spike
+        raw_yaw_deg = base_heading_deg + yaw_wave + yaw_spike
+
+        # Use yaw directly so that backend-computed heading equals the base heading
+        if self._align_mirror_east_west:
+            yaw_deg = -raw_yaw_deg + self._align_offset_deg
+        else:
+            yaw_deg = raw_yaw_deg + self._align_offset_deg
 
         roll_rad = np.radians(roll_deg)
         pitch_rad = np.radians(pitch_deg)
@@ -285,7 +301,8 @@ class IMUPublisher:
 
         roll_rate = amp * 2.0 * np.pi * freq * np.cos(2.0 * np.pi * freq * t)
         pitch_rate = (amp / 2.0) * 2.0 * np.pi * freq * np.cos(2.0 * np.pi * freq * t + np.pi / 2.0)
-        yaw_rate = yaw_wave_amp_deg * 2.0 * np.pi * freq * np.cos(2.0 * np.pi * freq * t + np.pi / 3.0)
+        raw_yaw_rate = yaw_wave_amp_deg * 2.0 * np.pi * freq * np.cos(2.0 * np.pi * freq * t + np.pi / 3.0)
+        yaw_rate = (-raw_yaw_rate) if self._align_mirror_east_west else raw_yaw_rate
         omega = np.array([roll_rate, pitch_rate, yaw_rate], dtype=float)
 
         a_lin = np.zeros(3, dtype=float)
