@@ -10,20 +10,22 @@ import SensorData from '../components/SensorData';
 import SystemStatus from '../components/SystemStatus';
 import Widgets from '../components/Widgets';
 import SimulationManager from '../components/SimulationManager';
+import RecordingManager from '../components/RecordingManager';
 
 const MISSION_THRESHOLD = 2; // meters
 
 const panelOptions = [
   { value: '3d', label: '3D Model', component: BoatViewer },
-  { value: 'gps', label: 'GPS', component: MapPanel },
-  { value: 'radar', label: 'Radar', component: RadarViewer },
+  { value: 'gps', label: 'GPS View', component: MapPanel },
+  { value: 'radar', label: 'Radar View', component: RadarViewer },
   { value: 'currentMission', label: 'Current Mission', component: CurrentMissionViewer },
   { value: 'missionsManager', label: 'Missions Manager', component: MissionsManagerViewer },
  // { value: 'cameras', label: 'Onboard Cameras', component: CamerasViewer },
   { value: 'sensorData', label: 'Sensor Data', component: SensorData },
   { value: 'systemStatus', label: 'System Status', component: SystemStatus },
-  { value: 'widgets', label: 'Widgets', component: Widgets },
+  { value: 'widgets', label: 'Widgets View', component: Widgets },
   { value: 'simulationManager', label: 'Simulation Manager', component: SimulationManager },
+  { value: 'recordingManager', label: 'Recording Manager', component: RecordingManager },
 ];
 
 // Opciones ordenadas alfabéticamente por etiqueta para los dropdowns

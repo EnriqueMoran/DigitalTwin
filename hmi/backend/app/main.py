@@ -1,11 +1,12 @@
 import asyncio
+import base64
 import json
 import os
 import time
 from datetime import datetime
 from math import atan2, cos, radians, sin, sqrt, pi, isfinite, degrees
 from pathlib import Path
-from typing import Dict, Any, Set, Optional
+from typing import Dict, Any, Set, Optional, List
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -116,6 +117,30 @@ TRACK_BEARING_MAX = 5.0
 TRACK_HEADING_MAX = 5.0
 TRACK_TIMEOUT = 5.0
 
+# Shared directory where recordings will be stored/read
+SHARED_DIR = Path("/app/backend/shared/recordings")
+
+# Recording state
+RECORDING_ACTIVE: bool = False
+RECORDING_PAUSED: bool = False
+RECORDING_TOPICS: Optional[List[str]] = None  # None => all
+RECORDING_BUFFER: List[Dict[str, Any]] = []
+RECORDING_FILE: Optional[Path] = None
+RECORDING_START_TS: Optional[float] = None
+RECORDING_COUNT: int = 0
+
+# Replay state
+REPLAY_ACTIVE: bool = False
+REPLAY_PAUSED: bool = False
+REPLAY_TOPICS: Optional[List[str]] = None  # None => all
+REPLAY_FILE: Optional[Path] = None
+REPLAY_TASK: Optional[asyncio.Task] = None
+REPLAY_START_MONO: Optional[float] = None
+REPLAY_BASE_TS: Optional[float] = None
+REPLAY_MESSAGES: List[Dict[str, Any]] = []
+REPLAY_COUNT: int = 0
+REPLAY_IDX: int = 0
+
 
 def _update_radar_track(distance: float, bearing: float, heading: float) -> None:
     now = time.time()
@@ -191,6 +216,20 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
     except json.JSONDecodeError:
         return
     LAST_MESSAGE_TIME = time.time()
+
+    # Recording hook: capture raw payload and topic
+    global RECORDING_ACTIVE, RECORDING_PAUSED, RECORDING_TOPICS, RECORDING_BUFFER, RECORDING_COUNT
+    if RECORDING_ACTIVE and not RECORDING_PAUSED:
+        try:
+            if (not RECORDING_TOPICS) or (msg.topic in set(RECORDING_TOPICS)):
+                RECORDING_BUFFER.append({
+                    "timestamp": time.time(),
+                    "topic": msg.topic,
+                    "payload": base64.b64encode(msg.payload).decode("utf-8"),
+                })
+                RECORDING_COUNT += 1
+        except Exception:
+            pass
 
     if topic in (TOPIC_SENSOR_GPS, TOPIC_SIM_GPS):
         # Gate GPS source: when sim active, ignore real sensor/*; when not active, ignore sim/*
@@ -499,6 +538,221 @@ async def _broadcast_loop():
                         except Exception:
                             pass
         await asyncio.sleep(0.01)
+
+
+def _sanitize_filename(name: str) -> str:
+    # Replace spaces and disallow path separators
+    safe = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in name.strip())
+    if not safe:
+        safe = "recording"
+    if not safe.lower().endswith(".json"):
+        safe += ".json"
+    return safe
+
+
+@app.get("/topics")
+async def list_topics() -> Dict[str, Any]:
+    return {"topics": list(_topics.keys())}
+
+
+@app.get("/recordings")
+async def list_recordings() -> Dict[str, Any]:
+    try:
+        SHARED_DIR.mkdir(parents=True, exist_ok=True)
+        files = [p.name for p in SHARED_DIR.glob("*.json") if p.is_file()]
+    except Exception:
+        files = []
+    return {"files": sorted(files)}
+
+
+@app.get("/recording/status")
+async def recording_status() -> Dict[str, Any]:
+    return {
+        "active": RECORDING_ACTIVE,
+        "paused": RECORDING_PAUSED,
+        "count": RECORDING_COUNT,
+        "file": str(RECORDING_FILE) if RECORDING_FILE else None,
+        "topics": RECORDING_TOPICS or [],
+        "started_at": RECORDING_START_TS,
+    }
+
+
+@app.post("/recording/start")
+async def recording_start(payload: Dict[str, Any]) -> Dict[str, Any]:
+    global RECORDING_ACTIVE, RECORDING_PAUSED, RECORDING_BUFFER, RECORDING_FILE, RECORDING_TOPICS
+    global RECORDING_START_TS, RECORDING_COUNT
+    name = str(payload.get("filename", "recording")).strip()
+    topics = payload.get("topics")
+    topics_list = None
+    if isinstance(topics, list) and topics:
+        topics_list = [str(t) for t in topics]
+    SHARED_DIR.mkdir(parents=True, exist_ok=True)
+    fname = _sanitize_filename(name)
+    RECORDING_FILE = SHARED_DIR / fname
+    RECORDING_BUFFER = []
+    RECORDING_TOPICS = topics_list
+    RECORDING_START_TS = time.time()
+    RECORDING_COUNT = 0
+    RECORDING_ACTIVE = True
+    RECORDING_PAUSED = False
+    return {"status": "ok", "file": RECORDING_FILE.name}
+
+
+@app.post("/recording/pause")
+async def recording_pause() -> Dict[str, str]:
+    global RECORDING_PAUSED
+    if RECORDING_ACTIVE:
+        RECORDING_PAUSED = True
+    return {"status": "ok"}
+
+
+@app.post("/recording/resume")
+async def recording_resume() -> Dict[str, str]:
+    global RECORDING_PAUSED
+    if RECORDING_ACTIVE:
+        RECORDING_PAUSED = False
+    return {"status": "ok"}
+
+
+@app.post("/recording/stop")
+async def recording_stop() -> Dict[str, Any]:
+    global RECORDING_ACTIVE, RECORDING_BUFFER, RECORDING_FILE
+    if not RECORDING_ACTIVE:
+        return {"status": "ok", "file": None, "count": 0}
+    try:
+        data = list(RECORDING_BUFFER)
+        with RECORDING_FILE.open("w", encoding="utf-8") as f:
+            json.dump(data, f)
+        count = len(data)
+    except Exception:
+        count = 0
+    finally:
+        RECORDING_ACTIVE = False
+        RECORDING_BUFFER = []
+        file_name = RECORDING_FILE.name if RECORDING_FILE else None
+        RECORDING_FILE = None
+    return {"status": "ok", "file": file_name, "count": count}
+
+
+async def _replay_runner():
+    global REPLAY_ACTIVE, REPLAY_PAUSED, REPLAY_COUNT, REPLAY_IDX, REPLAY_START_MONO, REPLAY_BASE_TS
+    try:
+        REPLAY_START_MONO = time.monotonic()
+        # base timestamp of first message
+        if not REPLAY_MESSAGES:
+            REPLAY_ACTIVE = False
+            return
+        REPLAY_BASE_TS = float(REPLAY_MESSAGES[0].get("timestamp", 0.0))
+        REPLAY_IDX = 0
+        while REPLAY_ACTIVE and REPLAY_IDX < len(REPLAY_MESSAGES):
+            if REPLAY_PAUSED:
+                await asyncio.sleep(0.05)
+                continue
+            msg = REPLAY_MESSAGES[REPLAY_IDX]
+            t_rel = float(msg.get("timestamp", 0.0)) - float(REPLAY_BASE_TS or 0.0)
+            target = (REPLAY_START_MONO or time.monotonic()) + max(0.0, t_rel)
+            # wait until target time
+            while not REPLAY_PAUSED and time.monotonic() < target and REPLAY_ACTIVE:
+                await asyncio.sleep(0.01)
+            if not REPLAY_ACTIVE:
+                break
+            if REPLAY_PAUSED:
+                # Adjust base so timing resumes smoothly after pause
+                REPLAY_START_MONO = time.monotonic() - max(0.0, t_rel)
+                await asyncio.sleep(0.05)
+                continue
+            topic = str(msg.get("topic"))
+            if (not REPLAY_TOPICS) or (topic in set(REPLAY_TOPICS)):
+                try:
+                    b = base64.b64decode(str(msg.get("payload", "")).encode("utf-8"))
+                    if MQTT_CLIENT:
+                        MQTT_CLIENT.publish(topic, b)
+                    REPLAY_COUNT += 1
+                except Exception:
+                    pass
+            REPLAY_IDX += 1
+    finally:
+        REPLAY_ACTIVE = False
+
+
+@app.get("/replay/status")
+async def replay_status() -> Dict[str, Any]:
+    return {
+        "active": REPLAY_ACTIVE,
+        "paused": REPLAY_PAUSED,
+        "count": REPLAY_COUNT,
+        "file": REPLAY_FILE.name if REPLAY_FILE else None,
+        "topics": REPLAY_TOPICS or [],
+        "index": REPLAY_IDX,
+        "total": len(REPLAY_MESSAGES),
+    }
+
+
+@app.post("/replay/start")
+async def replay_start(payload: Dict[str, Any]) -> Dict[str, Any]:
+    global REPLAY_ACTIVE, REPLAY_PAUSED, REPLAY_TOPICS, REPLAY_FILE, REPLAY_TASK
+    global REPLAY_MESSAGES, REPLAY_COUNT, REPLAY_IDX
+    name = str(payload.get("filename", "")).strip()
+    topics = payload.get("topics")
+    topics_list = None
+    if isinstance(topics, list) and topics:
+        topics_list = [str(t) for t in topics]
+    if not name:
+        return {"status": "error", "error": "filename required"}
+    fpath = SHARED_DIR / name
+    if not fpath.is_file():
+        return {"status": "error", "error": "file not found"}
+    try:
+        with fpath.open("r", encoding="utf-8") as f:
+            REPLAY_MESSAGES = json.load(f)
+    except Exception as e:
+        return {"status": "error", "error": f"failed to read file: {e}"}
+    REPLAY_FILE = fpath
+    REPLAY_TOPICS = topics_list
+    REPLAY_COUNT = 0
+    REPLAY_IDX = 0
+    REPLAY_ACTIVE = True
+    REPLAY_PAUSED = False
+    # Launch task
+    if REPLAY_TASK and not REPLAY_TASK.done():
+        try:
+            REPLAY_TASK.cancel()
+        except Exception:
+            pass
+    REPLAY_TASK = asyncio.create_task(_replay_runner())
+    return {"status": "ok"}
+
+
+@app.post("/replay/pause")
+async def replay_pause() -> Dict[str, str]:
+    global REPLAY_PAUSED
+    if REPLAY_ACTIVE:
+        REPLAY_PAUSED = True
+    return {"status": "ok"}
+
+
+@app.post("/replay/resume")
+async def replay_resume() -> Dict[str, str]:
+    global REPLAY_PAUSED, REPLAY_START_MONO
+    if REPLAY_ACTIVE:
+        REPLAY_PAUSED = False
+        # Reset base to now so subsequent timing is relative to remaining schedule
+        if REPLAY_IDX < len(REPLAY_MESSAGES):
+            cur_ts = float(REPLAY_MESSAGES[REPLAY_IDX].get("timestamp", 0.0))
+            REPLAY_START_MONO = time.monotonic() - (cur_ts - float(REPLAY_BASE_TS or 0.0))
+    return {"status": "ok"}
+
+
+@app.post("/replay/stop")
+async def replay_stop() -> Dict[str, Any]:
+    global REPLAY_ACTIVE, REPLAY_TASK
+    REPLAY_ACTIVE = False
+    if REPLAY_TASK and not REPLAY_TASK.done():
+        try:
+            REPLAY_TASK.cancel()
+        except Exception:
+            pass
+    return {"status": "ok"}
 
 
 @app.on_event("startup")

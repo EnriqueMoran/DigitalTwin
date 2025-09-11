@@ -12,15 +12,6 @@ services:
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log
 
-  mqtt_recorder:
-    build: ./mqtt_recorder
-    container_name: mqtt_recorder
-    volumes:
-      - ./shared:/data
-      - ./mqtt_recorder/config.json:/app/config.json:ro
-    depends_on:
-      - mosquitto
-
   esp32_sim:
     build:
       context: .
@@ -95,7 +86,7 @@ services:
     build: ./hmi/backend
     container_name: hmi_backend
     volumes:
-      - ./shared:/app/backend/shared:ro
+      - ./shared:/app/backend/shared
     ports:
       - "8001:8000"
     environment:
