@@ -14,11 +14,11 @@ function App() {
     lastGps: null,
   });
 
-  // Simulation override: if any simulator is active, force connection to Simulation
+  // If any simulator is active, connection is considered 'Simulation'
   const { imuActive, gpsActive } = useSimStore((s) => ({ imuActive: s.imuActive, gpsActive: s.gpsActive }));
   const simActive = imuActive || gpsActive;
 
-  // We now rely on backend for state machine; HMI still tracks last timestamps to show recency
+  // Backend owns the system state machine; frontend tracks last timestamps for recency display
   const prevImuActiveRef = useRef(false);
   const prevGpsActiveRef = useRef(false);
   useEffect(() => {
@@ -48,7 +48,7 @@ function App() {
     return () => ws.close();
   }, []);
 
-  // Keep a lightweight recency updater for display (no state transitions — backend owns that)
+  // Lightweight timer to refresh displayed timestamps (no state transitions)
   useEffect(() => {
     const id = setInterval(() => {
       setStatus((prev) => ({ ...prev }));
@@ -58,7 +58,7 @@ function App() {
 
   const lastMessage = status.lastMessage ? new Date(status.lastMessage * 1000) : null;
 
-  // Effective connection comes from backend system_state
+  // Connection state comes from backend system_state
   const effectiveConnection = status.connection;
   const connClass =
     {

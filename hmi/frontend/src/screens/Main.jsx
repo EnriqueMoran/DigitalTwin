@@ -3,8 +3,8 @@ import { resetSimState } from '../state/simStore';
 import BoatViewer from '../components/BoatViewer';
 import MapPanel from '../components/MapPanel';
 import RadarViewer from '../components/RadarViewer';
-import CurrentMissionViewer from '../components/CurrentMissionViewer';
-import MissionsManagerViewer from '../components/MissionsManagerViewer';
+import CurrentRouteViewer from '../components/CurrentRouteViewer';
+import RoutesManagerViewer from '../components/RoutesManagerViewer';
 import CamerasViewer from '../components/CamerasViewer';
 import SensorData from '../components/SensorData';
 import SystemStatus from '../components/SystemStatus';
@@ -12,14 +12,14 @@ import Widgets from '../components/Widgets';
 import SimulationManager from '../components/SimulationManager';
 import RecordingManager from '../components/RecordingManager';
 
-const MISSION_THRESHOLD = 2; // meters
+const ROUTE_THRESHOLD = 2; // meters
 
 const panelOptions = [
   { value: '3d', label: '3D Model', component: BoatViewer },
   { value: 'gps', label: 'GPS View', component: MapPanel },
   { value: 'radar', label: 'Radar View', component: RadarViewer },
-  { value: 'currentMission', label: 'Current Mission', component: CurrentMissionViewer },
-  { value: 'missionsManager', label: 'Missions Manager', component: MissionsManagerViewer },
+  { value: 'currentRoute', label: 'Current Route View', component: CurrentRouteViewer },
+  { value: 'routesManager', label: 'Routes Manager', component: RoutesManagerViewer },
  // { value: 'cameras', label: 'Onboard Cameras', component: CamerasViewer },
   { value: 'sensorData', label: 'Sensor Data', component: SensorData },
   { value: 'systemStatus', label: 'System Status', component: SystemStatus },
@@ -28,7 +28,7 @@ const panelOptions = [
   { value: 'recordingManager', label: 'Recording Manager', component: RecordingManager },
 ];
 
-// Opciones ordenadas alfabéticamente por etiqueta para los dropdowns
+// Options sorted alphabetically by label for the dropdowns
 const sortedPanelOptions = [...panelOptions].sort((a, b) => a.label.localeCompare(b.label));
 
 export default function MainScreen({ sensors }) {
@@ -37,16 +37,16 @@ export default function MainScreen({ sensors }) {
   const [bottomLeftPanel, setBottomLeftPanel] = useState('systemStatus');
   const [bottomCenterPanel, setBottomCenterPanel] = useState('sensorData');
   const [bottomRightPanel, setBottomRightPanel] = useState('widgets');
-  const [missionsState, setMissionsState] = useState(() => {
+  const [routesState, setRoutesState] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem('missions') || '{}');
+      return JSON.parse(localStorage.getItem('routes') || '{}');
     } catch (e) {
       return {};
     }
   });
   const [mode, setMode] = useState(() => localStorage.getItem('mode') || 'Manual');
-  const [currentMission, setCurrentMission] = useState(() => {
-    const m = localStorage.getItem('currentMission');
+  const [currentRoute, setCurrentRoute] = useState(() => {
+    const m = localStorage.getItem('currentRoute');
     return m === '' ? null : m;
   });
   const [currentWpIdx, setCurrentWpIdx] = useState(() => {
@@ -61,12 +61,12 @@ export default function MainScreen({ sensors }) {
       return [];
     }
   });
-  const [selectedMission, setSelectedMission] = useState('');
+  const [selectedRoute, setSelectedRoute] = useState('');
   const prevGpsPos = useRef(gpsTrail[gpsTrail.length - 1] || null);
 
-  const setMissions = (m) => {
-    setMissionsState(m);
-    localStorage.setItem('missions', JSON.stringify(m));
+  const setRoutes = (m) => {
+    setRoutesState(m);
+    localStorage.setItem('routes', JSON.stringify(m));
   };
 
   useEffect(() => {
@@ -74,8 +74,8 @@ export default function MainScreen({ sensors }) {
   }, [mode]);
 
   useEffect(() => {
-    localStorage.setItem('currentMission', currentMission ?? '');
-  }, [currentMission]);
+    localStorage.setItem('currentRoute', currentRoute ?? '');
+  }, [currentRoute]);
 
   useEffect(() => {
     localStorage.setItem('currentWpIdx', String(currentWpIdx));
@@ -91,11 +91,11 @@ export default function MainScreen({ sensors }) {
     const prev = Number(localStorage.getItem('serviceUptime') || '0');
     if (uptime < prev) {
       setMode('Manual');
-      setCurrentMission(null);
+      setCurrentRoute(null);
       setCurrentWpIdx(0);
       setGpsTrail([]);
       localStorage.removeItem('mode');
-      localStorage.removeItem('currentMission');
+      localStorage.removeItem('currentRoute');
       localStorage.removeItem('currentWpIdx');
       localStorage.removeItem('gpsTrail');
       // Also reset simulation forms/store on service restart
@@ -105,11 +105,11 @@ export default function MainScreen({ sensors }) {
   }, [sensors.uptime]);
 
   useEffect(() => {
-    if (mode !== 'Mission' || !currentMission) return;
-    const mission = missionsState[currentMission];
-    if (!mission || mission.length === 0) {
+    if (!String(mode).startsWith('Route') || !currentRoute) return;
+    const route = routesState[currentRoute];
+    if (!route || route.length === 0) {
       setMode('Manual');
-      setCurrentMission(null);
+      setCurrentRoute(null);
       return;
     }
     const latRaw =
@@ -126,23 +126,23 @@ export default function MainScreen({ sensors }) {
     const lat = latRaw == null ? NaN : Number(latRaw);
     const lon = lonRaw == null ? NaN : Number(lonRaw);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-    const wp = mission[currentWpIdx];
+    const wp = route[currentWpIdx];
     const dist = haversine(
       normalizeLat(lat),
       normalizeLng(lon),
       normalizeLat(Number(wp.lat)),
       normalizeLng(Number(wp.lon))
     );
-    if (dist <= MISSION_THRESHOLD) {
-      if (currentWpIdx + 1 >= mission.length) {
+    if (dist <= ROUTE_THRESHOLD) {
+      if (currentWpIdx + 1 >= route.length) {
         setMode('Manual');
-        setCurrentMission(null);
+        setCurrentRoute(null);
         setCurrentWpIdx(0);
       } else {
         setCurrentWpIdx((i) => i + 1);
       }
     }
-  }, [sensors, mode, currentMission, currentWpIdx, missionsState]);
+  }, [sensors, mode, currentRoute, currentWpIdx, routesState]);
 
   useEffect(() => {
     const latRaw =
@@ -166,16 +166,16 @@ export default function MainScreen({ sensors }) {
     }
   }, [sensors]);
 
-  const startMission = (name) => {
-    if (!missionsState[name]) return;
-    setCurrentMission(name);
+  const startRoute = (name) => {
+    if (!routesState[name]) return;
+    setCurrentRoute(name);
     setCurrentWpIdx(0);
-    setMode('Mission');
+    setMode('Route (Manual)');
   };
 
-  const cancelMission = () => {
+  const cancelRoute = () => {
     setMode('Manual');
-    setCurrentMission(null);
+    setCurrentRoute(null);
     setCurrentWpIdx(0);
   };
 
@@ -189,15 +189,15 @@ export default function MainScreen({ sensors }) {
       <Comp
         sensors={sensorsWithMode}
         mode={mode}
-        missions={missionsState}
-        setMissions={setMissions}
-        currentMission={currentMission}
-        startMission={startMission}
-        cancelMission={cancelMission}
+        routes={routesState}
+        setRoutes={setRoutes}
+        currentRoute={currentRoute}
+        startRoute={startRoute}
+        cancelRoute={cancelRoute}
         currentWpIdx={currentWpIdx}
         trail={gpsTrail}
-        selectedMission={selectedMission}
-        setSelectedMission={setSelectedMission}
+        selectedRoute={selectedRoute}
+        setSelectedRoute={setSelectedRoute}
         clearTrail={() => setGpsTrail([])}
       />
     );

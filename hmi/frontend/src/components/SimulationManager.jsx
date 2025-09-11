@@ -11,7 +11,7 @@ const waves = {
   storm: { amp: 18.0, freq: 0.80, spike_prob: 0.030, spike_amp: 8.0 },
 };
 
-export default function SimulationManager({ missions = {}, sensors = {}, clearTrail = undefined }) {
+export default function SimulationManager({ routes = {}, sensors = {}, clearTrail = undefined }) {
   const normalizeLng = (lng) => {
     if (!Number.isFinite(lng)) return lng;
     return ((lng + 180) % 360 + 360) % 360 - 180;
@@ -46,7 +46,7 @@ export default function SimulationManager({ missions = {}, sensors = {}, clearTr
     imuActive: s.imuActive,
   }));
 
-  const missionNames = Object.keys(missions);
+  const routeNames = Object.keys(routes);
 
   const sendGps = async (payload) => {
     const withHeading = { ...payload };
@@ -71,7 +71,7 @@ export default function SimulationManager({ missions = {}, sensors = {}, clearTr
   // When following a route, automatically advance target and adjust heading
   useEffect(() => {
     if (!gpsActive || gpsMode !== 'ROUTE') return;
-    const pts = missions[routeName];
+    const pts = routes[routeName];
     if (!pts || pts.length < 2) return;
 
     // Current position from sensors
@@ -130,10 +130,10 @@ export default function SimulationManager({ missions = {}, sensors = {}, clearTr
       })();
       setSimState({ routeNextLat: nextLat, routeNextLon: nextLon });
     }
-  }, [gpsActive, gpsMode, routeName, missions, sensors?.latitude, sensors?.gps_latitude, sensors?.longitude, sensors?.gps_longitude, routeNextLat, routeNextLon, gpsSpd]);
+  }, [gpsActive, gpsMode, routeName, routes, sensors?.latitude, sensors?.gps_latitude, sensors?.longitude, sensors?.gps_longitude, routeNextLat, routeNextLon, gpsSpd]);
 
   const handleFollowRoute = async () => {
-    const pts = missions[routeName];
+    const pts = routes[routeName];
     if (!pts || pts.length < 2) return;
     // Clear trail when starting a new Follow Route
     try { if (typeof clearTrail === 'function') clearTrail(); } catch (_) {}
@@ -238,7 +238,7 @@ export default function SimulationManager({ missions = {}, sensors = {}, clearTr
             next_lat = routeNextLat;
             next_lon = routeNextLon;
           } else {
-            const pts = missions[routeName];
+            const pts = routes[routeName];
             if (pts && pts.length >= 2) {
               next_lat = normalizeLat(Number(pts[1].lat));
               next_lon = normalizeLng(Number(pts[1].lon));
@@ -287,7 +287,7 @@ export default function SimulationManager({ missions = {}, sensors = {}, clearTr
             onChange={(e) => {
               const name = e.target.value;
               const patch = { routeName: name };
-              const pts = missions[name];
+              const pts = routes[name];
               if (Array.isArray(pts) && pts.length > 0) {
                 const lat0 = Number(pts[0].lat);
                 const lon0 = Number(pts[0].lon);
@@ -300,7 +300,7 @@ export default function SimulationManager({ missions = {}, sensors = {}, clearTr
             }}
           >
             <option value="">Select route</option>
-            {missionNames.map((name) => (
+            {routeNames.map((name) => (
               <option key={name} value={name}>
                 {name}
               </option>

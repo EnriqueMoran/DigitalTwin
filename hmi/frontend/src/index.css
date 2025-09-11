@@ -76,9 +76,9 @@ body {
   overflow: hidden;
 }
 
-/* Ensure mission panels scroll inside fixed bottom panels (account for padding) */
-.bottom-panels .panel > .mission-manager,
-.bottom-panels .panel > .current-mission {
+/* Ensure route panels scroll inside fixed bottom panels (account for padding) */
+.bottom-panels .panel > .route-manager,
+.bottom-panels .panel > .current-route {
   height: calc(100% - 1rem); /* subtract vertical padding (0.5rem top + 0.5rem bottom) */
   overflow: auto;
 }
@@ -132,39 +132,39 @@ body {
 .legend-color.heading { background: red; }
 .legend-color.cog { background: orange; }
 
-/* Missions panels */
-.mission-manager,
-.current-mission {
+/* Routes panels */
+.route-manager,
+.current-route {
   /* Allow inner scroll independent from outer panel */
   height: 100%;
   overflow: auto;
 }
-.mission-manager .controls,
-.current-mission .controls {
+.route-manager .controls,
+.current-route .controls {
   display: flex;
   gap: 0.5rem;
   align-items: center;
   margin-bottom: 0.5rem;
 }
 
-.mission-manager .controls select,
-.current-mission .controls select {
+.route-manager .controls select,
+.current-route .controls select {
   width: 180px;
 }
 
-.mission-table {
+.route-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.mission-table th,
-.mission-table td {
+.route-table th,
+.route-table td {
   border: 1px solid #444;
   padding: 0.25rem;
   text-align: center;
 }
 
-.mission-table input {
+.route-table input {
   width: 100%;
   background: transparent;
   color: #fff;
@@ -212,16 +212,16 @@ body {
   gap: 0.5rem;
 }
 
-.mission-table tr.active {
+.route-table tr.active {
   background: #333;
   outline: 2px solid #0ff;
 }
 
-.current-mission .info-table {
+.current-route .info-table {
   margin-top: 0.5rem;
 }
 
-.mission-icon {
+.route-icon {
   width: 24px;
   height: 24px;
   border-radius: 50%;
@@ -234,11 +234,11 @@ body {
   font-size: 12px;
 }
 
-.mission-icon.active {
+.route-icon.active {
   background: #ff5722;
 }
 
-.current-mission .info-table td {
+.current-route .info-table td {
   padding: 0.25rem;
 }
 

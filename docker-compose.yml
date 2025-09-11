@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   mosquitto:
     image: eclipse-mosquitto:2.0
@@ -12,19 +10,6 @@ services:
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log
 
-  esp32_sim:
-    build:
-      context: .
-      dockerfile: ./simulators/esp32_sim/Dockerfile
-    container_name: esp32_sim
-    volumes:
-      - ./shared:/app/simulators/shared:ro
-    environment:
-      - RUN_TESTS=0
-      - ESP32_SIM_CONFIG=/app/simulators/esp32_sim/config.ini
-    depends_on:
-      - mosquitto
-
   imu_sim:
     build:
       context: .
@@ -33,8 +18,6 @@ services:
     volumes:
       - ./shared:/app/simulators/shared:ro
     environment:
-      - HOST=esp32_sim
-      - PORT=9000
       - RUN_TESTS=0
       - DISPLAY=host.docker.internal:0.0
       - MPLBACKEND=TkAgg
@@ -49,8 +32,6 @@ services:
     volumes:
       - ./shared:/app/simulators/shared:ro
     environment:
-      - HOST=esp32_sim
-      - PORT=9000
       - RUN_TESTS=0
     depends_on:
       - mosquitto
@@ -63,8 +44,6 @@ services:
     volumes:
       - ./shared:/app/simulators/shared:ro
     environment:
-      - HOST=esp32_sim
-      - PORT=9000
       - RUN_TESTS=0
     depends_on:
       - mosquitto

@@ -34,8 +34,8 @@ const normalizeLatLng = (lat, lng) => {
   return [normalizeLat(wrapped.lat), normalizeLng(wrapped.lng)];
 };
 
-const createMissionIcon = (num, active) => {
-  const cls = active ? 'mission-icon active' : 'mission-icon';
+const createRouteIcon = (num, active) => {
+  const cls = active ? 'route-icon active' : 'route-icon';
   return L.divIcon({
     html: `<div class="${cls}">${num}</div>`,
     className: '',
@@ -54,9 +54,9 @@ function MapReadyListener({ onReady }) {
 
 export default function MapPanel({
   sensors,
-  missions = {},
-  selectedMission = '',
-  currentMission,
+  routes = {},
+  selectedRoute = '',
+  currentRoute,
   currentWpIdx = 0,
   trail = [],
   clearTrail = () => {},
@@ -72,12 +72,12 @@ export default function MapPanel({
 
   const [follow, setFollow] = useState(true);
   const [position, setPosition] = useState(null);
-  const [showMission, setShowMission] = useState(false);
+  const [showRoute, setShowRoute] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
 
   useEffect(() => { sensorsRef.current = sensors; }, [sensors]);
   useEffect(() => { followRef.current = follow; }, [follow]);
-  useEffect(() => setShowMission(false), [selectedMission]);
+  useEffect(() => setShowRoute(false), [selectedRoute]);
 
   const PAN_MIN_MS = 125;
 
@@ -227,12 +227,11 @@ export default function MapPanel({
     setContextMenu(null);
   };
 
-  const missionWps = selectedMission ? missions[selectedMission] || [] : [];
-  const activeIdx =
-    currentMission === selectedMission ? currentWpIdx : 0;
+  const routeWps = selectedRoute ? routes[selectedRoute] || [] : [];
+  const activeIdx = currentRoute === selectedRoute ? currentWpIdx : 0;
 
-  const missionMarkers = showMission
-    ? missionWps.map((wp, idx) => {
+  const routeMarkers = showRoute
+    ? routeWps.map((wp, idx) => {
         const lat = Number(wp.lat);
         const lon = Number(wp.lon);
         const [latN, lonN] = normalizeLatLng(lat, lon);
@@ -240,7 +239,7 @@ export default function MapPanel({
         <Marker
           key={`m${idx}`}
           position={[latN, lonN]}
-          icon={createMissionIcon(idx + 1, idx === activeIdx)}
+          icon={createRouteIcon(idx + 1, idx === activeIdx)}
         />
         );
       })
@@ -252,7 +251,7 @@ export default function MapPanel({
         <MapReadyListener onReady={handleMapReady} />
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" noWrap={false} />
         <Polyline positions={trail} pathOptions={{ color: 'yellow', dashArray: '4 4' }} />
-        {missionMarkers}
+        {routeMarkers}
         {position && <Marker position={position} icon={memoIcon} ref={markerRef} />}
       </MapContainer>
 
@@ -261,8 +260,8 @@ export default function MapPanel({
         <button onClick={handleFollow} disabled={follow}>
           {follow ? 'Following' : 'Follow'}
         </button>
-        <button onClick={() => setShowMission((s) => !s)} disabled={!selectedMission}>
-          Mission points
+        <button onClick={() => setShowRoute((s) => !s)} disabled={!selectedRoute}>
+          Route points
         </button>
         <button onClick={clearTrail} disabled={(trail?.length || 0) === 0}>
           Clear trail

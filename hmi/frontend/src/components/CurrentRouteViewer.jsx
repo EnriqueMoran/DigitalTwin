@@ -1,20 +1,20 @@
-export default function CurrentMissionViewer({
+export default function CurrentRouteViewer({
   sensors = {},
-  missions = {},
-  currentMission,
-  selectedMission = '',
-  setSelectedMission = () => {},
-  startMission = () => {},
-  cancelMission = () => {},
+  routes = {},
+  currentRoute,
+  selectedRoute = '',
+  setSelectedRoute = () => {},
+  startRoute = () => {},
+  cancelRoute = () => {},
   currentWpIdx = 0,
   mode = 'Manual',
 }) {
-  const selected = selectedMission || '';
+  const selected = selectedRoute || '';
 
-  const missionNames = Object.keys(missions);
-  const waypoints = selected ? missions[selected] || [] : [];
+  const routeNames = Object.keys(routes);
+  const waypoints = selected ? routes[selected] || [] : [];
 
-  const isActive = mode === 'Mission' && currentMission === selected;
+  const isActive = (mode || '').startsWith('Route') && currentRoute === selected;
 
   const normalizeLng = (lng) => {
     if (!Number.isFinite(lng)) return lng;
@@ -76,27 +76,27 @@ export default function CurrentMissionViewer({
       : null;
 
   const handleAction = () => {
-    if (isActive) cancelMission();
-    else if (selected) startMission(selected);
+    if (isActive) cancelRoute();
+    else if (selected) startRoute(selected);
   };
 
   return (
-    <div className="current-mission">
+    <div className="current-route">
       <div className="controls">
-        <select value={selected} onChange={(e) => setSelectedMission(e.target.value)}>
-          <option value="">Select mission</option>
-          {missionNames.map((name) => (
+        <select value={selected} onChange={(e) => setSelectedRoute(e.target.value)}>
+          <option value="">Select route</option>
+          {routeNames.map((name) => (
             <option key={name} value={name}>
               {name}
             </option>
           ))}
         </select>
         <button onClick={handleAction} disabled={!selected && !isActive}>
-          {isActive ? 'Abort Mission' : 'Start Mission'}
+          {isActive ? 'Abort Route' : 'Start Route'}
         </button>
       </div>
 
-      <table className="mission-table">
+      <table className="route-table">
         <thead>
           <tr>
             <th>#</th>

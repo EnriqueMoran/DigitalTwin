@@ -19,7 +19,7 @@ const normalizeLat = (lat) => {
   return Math.max(-90, Math.min(90, lat));
 };
 
-export default function MissionsManagerViewer({ missions = {}, setMissions = () => {} }) {
+export default function RoutesManagerViewer({ routes = {}, setRoutes = () => {} }) {
   const [selected, setSelected] = useState('');
   const [waypoints, setWaypoints] = useState(
     Array.from({ length: MAX_WAYPOINTS }, emptyWaypoint)
@@ -28,12 +28,12 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
   const [newName, setNewName] = useState('');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  const missionNames = Object.keys(missions);
+  const routeNames = Object.keys(routes);
 
   useEffect(() => {
-    if (selected && missions[selected]) {
+    if (selected && routes[selected]) {
       const wps = Array.from({ length: MAX_WAYPOINTS }, emptyWaypoint);
-      missions[selected].forEach((wp, i) => {
+      routes[selected].forEach((wp, i) => {
         if (i < MAX_WAYPOINTS) {
           wps[i] = {
             lat: normalizeLat(Number(wp.lat)).toFixed(DECIMALS),
@@ -45,7 +45,7 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
     } else {
       setWaypoints(Array.from({ length: MAX_WAYPOINTS }, emptyWaypoint));
     }
-  }, [selected, missions]);
+  }, [selected, routes]);
 
   const updateWaypoint = (idx, field, value) => {
     const updated = [...waypoints];
@@ -59,7 +59,7 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
     setWaypoints(updated);
   };
 
-  const saveMission = () => {
+  const saveRoute = () => {
     if (!selected) {
       setNewName('');
       setShowNameDialog(true);
@@ -71,10 +71,10 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
         lat: normalizeLat(parseFloat(formatDecimals(wp.lat))),
         lon: normalizeLng(parseFloat(formatDecimals(wp.lon))),
       }));
-    setMissions({ ...missions, [selected]: converted });
+    setRoutes({ ...routes, [selected]: converted });
   };
 
-  const confirmNewMission = () => {
+  const confirmNewRoute = () => {
     if (!newName.trim()) return;
     const converted = waypoints
       .filter((wp) => wp.lat !== '' && wp.lon !== '')
@@ -82,31 +82,31 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
         lat: normalizeLat(parseFloat(formatDecimals(wp.lat))),
         lon: normalizeLng(parseFloat(formatDecimals(wp.lon))),
       }));
-    setMissions({ ...missions, [newName]: converted });
+    setRoutes({ ...routes, [newName]: converted });
     setSelected(newName);
     setShowNameDialog(false);
   };
 
-  const deleteMission = () => {
+  const deleteRoute = () => {
     if (!selected) return;
     setShowDeleteDialog(true);
   };
 
   const confirmDelete = () => {
-    const updated = { ...missions };
+    const updated = { ...routes };
     delete updated[selected];
-    setMissions(updated);
+    setRoutes(updated);
     setSelected('');
     setWaypoints([]);
     setShowDeleteDialog(false);
   };
 
   return (
-    <div className="mission-manager">
+    <div className="route-manager">
       <div className="controls">
         <select value={selected} onChange={(e) => setSelected(e.target.value)}>
-          <option value="">Select mission</option>
-          {missionNames.map((name) => (
+          <option value="">Select route</option>
+          {routeNames.map((name) => (
             <option key={name} value={name}>
               {name}
             </option>
@@ -120,15 +120,15 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
             );
           }}
         >
-          New Mission
+          New Route
         </button>
-        <button onClick={saveMission}>Save</button>
-        <button onClick={deleteMission} disabled={!selected}>
+        <button onClick={saveRoute}>Save</button>
+        <button onClick={deleteRoute} disabled={!selected}>
           Delete
         </button>
       </div>
 
-      <table className="mission-table">
+      <table className="route-table">
         <thead>
           <tr>
             <th>#</th>
@@ -169,10 +169,10 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
       {showNameDialog && (
         <div className="overlay">
           <div className="dialog">
-            <p>Enter mission name:</p>
+            <p>Enter route name:</p>
             <input value={newName} onChange={(e) => setNewName(e.target.value)} />
             <div className="dialog-buttons">
-              <button onClick={confirmNewMission}>Confirm</button>
+              <button onClick={confirmNewRoute}>Confirm</button>
               <button onClick={() => setShowNameDialog(false)}>Cancel</button>
             </div>
           </div>
@@ -182,7 +182,7 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
       {showDeleteDialog && (
         <div className="overlay">
           <div className="dialog">
-            <p>Do you want to delete the mission?</p>
+            <p>Do you want to delete the route?</p>
             <div className="dialog-buttons">
               <button onClick={confirmDelete}>Yes</button>
               <button onClick={() => setShowDeleteDialog(false)}>No</button>
@@ -193,3 +193,4 @@ export default function MissionsManagerViewer({ missions = {}, setMissions = () 
     </div>
   );
 }
+
