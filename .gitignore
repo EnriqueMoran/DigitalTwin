@@ -209,5 +209,5 @@ __marimo__/
 hmi/frontend/node_modules/
 hmi/frontend/dist/
 simulators/scenarios/*
-shared/recording.json
 .vscode/
+shared/recordings/*

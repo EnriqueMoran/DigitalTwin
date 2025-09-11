@@ -118,7 +118,7 @@ if __name__ == '__main__':
 
     if mode == 'record':
         record_mode(client, save_file)
-    elif mode == 'replay':
+    elif mode == 'replay' or mode == 'play':
         replay_mode(client, load_file, topics, log_messages)
     else:
         raise ValueError(f"Unknown mode: {mode}")

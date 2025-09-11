@@ -19,7 +19,7 @@ const panelOptions = [
   { value: 'radar', label: 'Radar', component: RadarViewer },
   { value: 'currentMission', label: 'Current Mission', component: CurrentMissionViewer },
   { value: 'missionsManager', label: 'Missions Manager', component: MissionsManagerViewer },
-  { value: 'cameras', label: 'Onboard Cameras', component: CamerasViewer },
+ // { value: 'cameras', label: 'Onboard Cameras', component: CamerasViewer },
   { value: 'sensorData', label: 'Sensor Data', component: SensorData },
   { value: 'systemStatus', label: 'System Status', component: SystemStatus },
   { value: 'widgets', label: 'Widgets', component: Widgets },

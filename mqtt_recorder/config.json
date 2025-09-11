@@ -3,8 +3,8 @@
   "mode": "record",
   "host": "mosquitto",
   "port": 1883,
-  "save_file": "/data/recording.json",
-  "load_file": "/data/recording.json",
+  "save_file": "/data/recordings/recording.json",
+  "load_file": "/data/recordings/recording.json",
   "topics": [],
   "log_messages": false
 }
