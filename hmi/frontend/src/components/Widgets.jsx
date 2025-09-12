@@ -102,7 +102,7 @@ function AttitudeIndicator({ roll = 0, pitch = 0, size = 150 }) {
   return <canvas ref={canvasRef} width={size} height={size} className="widget-canvas" />;
 }
 
-function Speedometer({ value = 0, max = 20, size = 150 }) {
+function Speedometer({ value = 0, max = 10, size = 150 }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -136,7 +136,8 @@ function Speedometer({ value = 0, max = 20, size = 150 }) {
       ctx.moveTo(x1, y1);
       ctx.lineTo(x2, y2);
       ctx.stroke();
-      ctx.fillText(String(value), (radius - 25) * Math.cos(angle), (radius - 25) * Math.sin(angle));
+      // Show labels with exactly two decimals to avoid FP artifacts
+      ctx.fillText(value.toFixed(2), (radius - 25) * Math.cos(angle), (radius - 25) * Math.sin(angle));
     }
 
     const angle = start - (value / max) * total;

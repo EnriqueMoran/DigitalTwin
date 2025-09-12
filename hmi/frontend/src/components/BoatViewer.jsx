@@ -34,7 +34,22 @@ export default function BoatViewer({ sensors }) {
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.addEventListener('start', () => setLive(false));
+
+    let wheelActive = false;
+    let wheelTimer = null;
+    const onWheel = () => {
+      wheelActive = true;
+      if (wheelTimer) clearTimeout(wheelTimer);
+      wheelTimer = setTimeout(() => {
+        wheelActive = false;
+      }, 200);
+    };
+    renderer.domElement.addEventListener('wheel', onWheel, { passive: true });
+
+    const onControlsStart = () => {
+      if (!wheelActive) setLive(false);
+    };
+    controls.addEventListener('start', onControlsStart);
     controlsRef.current = controls;
 
     const light = new THREE.DirectionalLight(0xffffff, 1);
@@ -121,6 +136,12 @@ export default function BoatViewer({ sensors }) {
     return () => {
       window.removeEventListener('resize', handleResize);
       mount.removeChild(renderer.domElement);
+      try {
+        renderer.domElement.removeEventListener('wheel', onWheel);
+      } catch {}
+      try {
+        controls.removeEventListener('start', onControlsStart);
+      } catch {}
     };
   }, []);
 

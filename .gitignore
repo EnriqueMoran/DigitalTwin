@@ -211,3 +211,5 @@ hmi/frontend/dist/
 simulators/scenarios/*
 .vscode/
 shared/recordings/*
+shared/routes.json
+shared/trail.json

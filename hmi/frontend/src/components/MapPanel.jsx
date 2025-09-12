@@ -247,9 +247,9 @@ export default function MapPanel({
 
   return (
     <div style={{ height: '100%', width: '100%', position: 'relative' }}>
-      <MapContainer center={[0, 0]} zoom={13} style={{ height: '100%', width: '100%' }} worldCopyJump={true}>
+      <MapContainer center={[0, 0]} zoom={13} maxZoom={22} style={{ height: '100%', width: '100%' }} worldCopyJump={true}>
         <MapReadyListener onReady={handleMapReady} />
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" noWrap={false} />
+        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" noWrap={false} maxZoom={22} maxNativeZoom={19} />
         <Polyline positions={trail} pathOptions={{ color: 'yellow', dashArray: '4 4' }} />
         {routeMarkers}
         {position && <Marker position={position} icon={memoIcon} ref={markerRef} />}
