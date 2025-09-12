@@ -1,7 +1,17 @@
 import React, { useEffect } from 'react';
 import { useSimStore, setSimState } from '../state/simStore';
 
-const API_BASE = import.meta.env.VITE_BACKEND_HTTP || 'http://localhost:8001';
+const deriveApiBase = () => {
+  try {
+    const proto = window?.location?.protocol || 'http:';
+    const host = window?.location?.hostname || 'localhost';
+    const port = '8001';
+    return `${proto}//${host}:${port}`;
+  } catch (_) {
+    return 'http://localhost:8001';
+  }
+};
+const API_BASE = import.meta.env.VITE_BACKEND_HTTP || deriveApiBase();
 
 const waves = {
   calm: { amp: 0.5,  freq: 0.2,  spike_prob: 0.0,   spike_amp: 0.0 },
@@ -283,6 +293,7 @@ export default function SimulationManager({ routes = {}, sensors = {}, clearTrai
         <h3>GPS Simulation</h3>
         <div>
           <select
+            style={{ width: 220 }}
             value={routeName}
             onChange={(e) => {
               const name = e.target.value;
@@ -311,6 +322,7 @@ export default function SimulationManager({ routes = {}, sensors = {}, clearTrai
           <label>Lat</label>
           <input
             type="text"
+            style={{ width: 110 }}
             value={gpsLat}
             onChange={(e) => setSimState({ gpsLat: e.target.value })}
           />
@@ -320,6 +332,7 @@ export default function SimulationManager({ routes = {}, sensors = {}, clearTrai
           <label>Lon</label>
           <input
             type="text"
+            style={{ width: 110 }}
             value={gpsLon}
             onChange={(e) => setSimState({ gpsLon: e.target.value })}
           />
@@ -329,6 +342,7 @@ export default function SimulationManager({ routes = {}, sensors = {}, clearTrai
           <input
             type="text"
             placeholder="Deg"
+            style={{ width: 110 }}
             value={gpsHdg}
             onChange={(e) => setSimState({ gpsHdg: e.target.value })}
           />
@@ -339,6 +353,7 @@ export default function SimulationManager({ routes = {}, sensors = {}, clearTrai
           <input
             type="text"
             placeholder="m/s"
+            style={{ width: 110 }}
             value={gpsSpd}
             onChange={(e) => setSimState({ gpsSpd: e.target.value })}
           />

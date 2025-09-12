@@ -19,6 +19,18 @@ const normalizeLat = (lat) => {
   return Math.max(-90, Math.min(90, lat));
 };
 
+// Minimal API helper (matches backend derive used elsewhere)
+const deriveApiBase = () => {
+  try {
+    const proto = window?.location?.protocol || 'http:';
+    const host = window?.location?.hostname || 'localhost';
+    return `${proto}//${host}:8001`;
+  } catch (_) {
+    return 'http://localhost:8001';
+  }
+};
+const API_BASE = (import.meta && import.meta.env && import.meta.env.VITE_BACKEND_HTTP) || deriveApiBase();
+
 export default function RoutesManagerViewer({ routes = {}, setRoutes = () => {} }) {
   const [selected, setSelected] = useState('');
   const [waypoints, setWaypoints] = useState(
@@ -59,7 +71,7 @@ export default function RoutesManagerViewer({ routes = {}, setRoutes = () => {} 
     setWaypoints(updated);
   };
 
-  const saveRoute = () => {
+  const saveRoute = async () => {
     if (!selected) {
       setNewName('');
       setShowNameDialog(true);
@@ -71,10 +83,16 @@ export default function RoutesManagerViewer({ routes = {}, setRoutes = () => {} 
         lat: normalizeLat(parseFloat(formatDecimals(wp.lat))),
         lon: normalizeLng(parseFloat(formatDecimals(wp.lon))),
       }));
-    setRoutes({ ...routes, [selected]: converted });
+    try {
+      await fetch(`${API_BASE}/routes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: selected, points: converted }),
+      });
+    } catch (_) {}
   };
 
-  const confirmNewRoute = () => {
+  const confirmNewRoute = async () => {
     if (!newName.trim()) return;
     const converted = waypoints
       .filter((wp) => wp.lat !== '' && wp.lon !== '')
@@ -82,7 +100,13 @@ export default function RoutesManagerViewer({ routes = {}, setRoutes = () => {} 
         lat: normalizeLat(parseFloat(formatDecimals(wp.lat))),
         lon: normalizeLng(parseFloat(formatDecimals(wp.lon))),
       }));
-    setRoutes({ ...routes, [newName]: converted });
+    try {
+      await fetch(`${API_BASE}/routes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName, points: converted }),
+      });
+    } catch (_) {}
     setSelected(newName);
     setShowNameDialog(false);
   };
@@ -92,10 +116,8 @@ export default function RoutesManagerViewer({ routes = {}, setRoutes = () => {} 
     setShowDeleteDialog(true);
   };
 
-  const confirmDelete = () => {
-    const updated = { ...routes };
-    delete updated[selected];
-    setRoutes(updated);
+  const confirmDelete = async () => {
+    try { await fetch(`${API_BASE}/routes/${encodeURIComponent(selected)}`, { method: 'DELETE' }); } catch (_) {}
     setSelected('');
     setWaypoints([]);
     setShowDeleteDialog(false);
@@ -193,4 +215,3 @@ export default function RoutesManagerViewer({ routes = {}, setRoutes = () => {} 
     </div>
   );
 }
-

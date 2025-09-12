@@ -15,7 +15,7 @@ drawCircle(45, 45, 40)
 BROKER
 style=wordwrap
 halign=center
-fontsize=28
+fontsize=26
 valign=center</panel_attributes><additional_attributes></additional_attributes></element><element><id>Text</id><coordinates><x>10</x><y>340</y><w>70</w><h>40</h></coordinates><panel_attributes>ESP32
 style=wordwrap
 halign=center
@@ -23,7 +23,7 @@ valign=center
 fontsize=12</panel_attributes><additional_attributes></additional_attributes></element><element><id>Text</id><coordinates><x>710</x><y>400</y><w>130</w><h>70</h></coordinates><panel_attributes>HMI
 style=wordwrap
 halign=center
-fontsize=36
+fontsize=30
 valign=center</panel_attributes><additional_attributes></additional_attributes></element><element><id>Relation</id><coordinates><x>70</x><y>440</y><w>310</w><h>50</h></coordinates><panel_attributes>lt=&lt;&lt;-
 sim/imu
 fg=red

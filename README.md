@@ -94,7 +94,7 @@ The HMI will be available at <http://localhost:3000>.
 ### ESP32‑S3 N16R8
 This microcontroller acts as a multiplexor between sensors and the ground station (backend), receiving real sensor data via I²C and UART.
 
-<p align="center"><img src="shared/docs/ESP32_eschema.png" alt="ESP32 schematic" width="70%"/></p>
+<p align="center"><img src="shared/docs/ESP32_eschema.png" alt="ESP32 schematic" width="90%"/></p>
 
 ### MPU9250
 Inertial sensor combining accelerometer, gyroscope, and magnetometer, providing real‑time orientation estimation.

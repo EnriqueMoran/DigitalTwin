@@ -119,6 +119,12 @@ TRACK_TIMEOUT = 5.0
 
 # Shared directory where recordings will be stored/read
 SHARED_DIR = Path("/app/backend/shared/recordings")
+ROUTES_FILE = Path("/app/backend/shared/routes.json")
+_ROUTES_LOCK = asyncio.Lock()
+UI_STATE_FILE = Path("/app/backend/shared/ui_state.json")
+TRAIL_FILE = Path("/app/backend/shared/trail.json")
+_STATE_LOCK = asyncio.Lock()
+_TRAIL_LOCK = asyncio.Lock()
 
 # Recording state
 RECORDING_ACTIVE: bool = False
@@ -360,6 +366,9 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
                 if gz is not None:
                     _est_heading = (_est_heading - gz * dt) % (2 * pi)
         _prev_imu_ts = ts
+        # Compute candidate heading from IMU data (mag tilt-comp or integrated gz),
+        # but only apply it to state for real sensor IMU messages.
+        candidate_heading = None
         if (
             mx is not None
             and my is not None
@@ -375,10 +384,12 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
                 + my * sin(roll) * sin(pitch)
                 + mz * cos(roll) * sin(pitch),
             )
-            STATE["heading"] = heading_tc % (2 * pi)
+            candidate_heading = heading_tc % (2 * pi)
         else:
-            STATE["heading"] = _est_heading
+            candidate_heading = _est_heading
 
+        if topic == TOPIC_SENSOR_IMU and candidate_heading is not None:
+            STATE["heading"] = candidate_heading
         # Apply heading corrections only for real IMU messages
         if topic == TOPIC_SENSOR_IMU and STATE["heading"] is not None:
             try:
@@ -788,6 +799,179 @@ async def websocket_endpoint(ws: WebSocket):
 
 @app.get("/health")
 async def health() -> Dict[str, str]:
+    return {"status": "ok"}
+
+
+# --------------- Routes persistence (shared across browsers) ---------------
+
+def _normalize_lat(lat: float) -> float:
+    try:
+        x = float(lat)
+    except Exception:
+        return float("nan")
+    return max(-90.0, min(90.0, x))
+
+
+def _normalize_lon(lon: float) -> float:
+    try:
+        x = float(lon)
+    except Exception:
+        return float("nan")
+    x = ((x + 180.0) % 360.0 + 360.0) % 360.0 - 180.0
+    return x
+
+
+async def _read_routes() -> Dict[str, list[dict]]:
+    try:
+        if not ROUTES_FILE.exists():
+            return {}
+        with ROUTES_FILE.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+        return {}
+    except Exception:
+        return {}
+
+
+async def _write_routes(routes: Dict[str, list[dict]]) -> None:
+    ROUTES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = ROUTES_FILE.with_suffix(".tmp")
+    with tmp.open("w", encoding="utf-8") as f:
+        json.dump(routes, f)
+    tmp.replace(ROUTES_FILE)
+
+
+def _read_json_file(path: Path, default):
+    try:
+        if not path.exists():
+            return default
+        with path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return default
+
+
+def _write_json_file(path: Path, obj) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    with tmp.open("w", encoding="utf-8") as f:
+        json.dump(obj, f)
+    tmp.replace(path)
+
+
+@app.get("/routes")
+async def get_routes() -> Dict[str, Any]:
+    async with _ROUTES_LOCK:
+        data = await _read_routes()
+    return {"routes": data}
+
+
+@app.post("/routes")
+async def save_route(payload: Dict[str, Any]) -> Dict[str, Any]:
+    name = str(payload.get("name", "")).strip()
+    pts = payload.get("points")
+    if not name:
+        return {"status": "error", "error": "name required"}
+    if not isinstance(pts, list):
+        return {"status": "error", "error": "points must be a list"}
+    # Limit to 10 points and normalize with 15 decimals
+    cleaned: list[dict] = []
+    for wp in pts[:10]:
+        try:
+            lat = _normalize_lat(float(wp.get("lat")))
+            lon = _normalize_lon(float(wp.get("lon")))
+            if not (isfinite(lat) and isfinite(lon)):
+                continue
+            cleaned.append({
+                "lat": float(f"{lat:.15f}"),
+                "lon": float(f"{lon:.15f}"),
+            })
+        except Exception:
+            continue
+    async with _ROUTES_LOCK:
+        data = await _read_routes()
+        data[name] = cleaned
+        await _write_routes(data)
+    return {"status": "ok"}
+
+
+@app.delete("/routes/{name}")
+async def delete_route(name: str) -> Dict[str, str]:
+    key = str(name).strip()
+    async with _ROUTES_LOCK:
+        data = await _read_routes()
+        if key in data:
+            del data[key]
+            await _write_routes(data)
+    return {"status": "ok"}
+
+
+# ------------------------- Shared UI state and trail -------------------------
+
+@app.get("/ui_state")
+async def get_ui_state() -> Dict[str, Any]:
+    async with _STATE_LOCK:
+        st = _read_json_file(UI_STATE_FILE, {})
+    mode = st.get("mode", "Manual")
+    current = st.get("currentRoute")
+    idx = st.get("currentWpIdx", 0)
+    try:
+        idx = int(idx)
+    except Exception:
+        idx = 0
+    return {"mode": mode, "currentRoute": current, "currentWpIdx": idx}
+
+
+@app.post("/ui_state")
+async def set_ui_state(payload: Dict[str, Any]) -> Dict[str, str]:
+    async with _STATE_LOCK:
+        st = _read_json_file(UI_STATE_FILE, {})
+        if "mode" in payload:
+            st["mode"] = str(payload.get("mode") or "Manual")
+        if "currentRoute" in payload:
+            cur = payload.get("currentRoute")
+            st["currentRoute"] = None if cur in ("", None) else str(cur)
+        if "currentWpIdx" in payload:
+            try:
+                st["currentWpIdx"] = int(payload.get("currentWpIdx") or 0)
+            except Exception:
+                st["currentWpIdx"] = 0
+        _write_json_file(UI_STATE_FILE, st)
+    return {"status": "ok"}
+
+
+@app.get("/trail")
+async def get_trail() -> Dict[str, Any]:
+    async with _TRAIL_LOCK:
+        pts = _read_json_file(TRAIL_FILE, [])
+        if not isinstance(pts, list):
+            pts = []
+    return {"points": pts}
+
+
+@app.post("/trail/append")
+async def append_trail(payload: Dict[str, Any]) -> Dict[str, str]:
+    try:
+        lat = float(payload.get("lat"))
+        lon = float(payload.get("lon"))
+    except Exception:
+        return {"status": "error"}
+    lat = _normalize_lat(lat)
+    lon = _normalize_lon(lon)
+    async with _TRAIL_LOCK:
+        pts = _read_json_file(TRAIL_FILE, [])
+        if not isinstance(pts, list):
+            pts = []
+        pts.append([lat, lon])
+        _write_json_file(TRAIL_FILE, pts)
+    return {"status": "ok"}
+
+
+@app.post("/trail/clear")
+async def clear_trail() -> Dict[str, str]:
+    async with _TRAIL_LOCK:
+        _write_json_file(TRAIL_FILE, [])
     return {"status": "ok"}
 
 

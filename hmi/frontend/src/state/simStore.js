@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
 
-const STORAGE_KEY = 'simManagerState';
-
 export const defaultState = {
   routeName: '',
   gpsLat: '0.0000000000000',
@@ -16,19 +14,7 @@ export const defaultState = {
   imuActive: false,
 };
 
-function loadState() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object') return parsed;
-  } catch (_) {
-    // ignore
-  }
-  return null;
-}
-
-const _loaded = loadState() || {};
+const _loaded = {};
 if (_loaded && _loaded.wave === 'none') {
   _loaded.wave = 'calm';
 }
@@ -47,21 +33,11 @@ export function getSimState() {
 
 export function setSimState(patch) {
   state = { ...state, ...patch };
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (_) {
-    // ignore quota or serialization errors
-  }
   emit();
 }
 
 export function resetSimState() {
   state = { ...defaultState };
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (_) {
-    // ignore
-  }
   emit();
 }
 
@@ -70,20 +46,7 @@ function subscribe(listener) {
   return () => listeners.delete(listener);
 }
 
-// Cross-tab sync via storage events
-if (typeof window !== 'undefined') {
-  window.addEventListener('storage', (e) => {
-    if (e.key === STORAGE_KEY) {
-      try {
-        const next = e.newValue ? JSON.parse(e.newValue) : defaultState;
-        state = { ...defaultState, ...(next || {}) };
-        emit();
-      } catch (_) {
-        // ignore
-      }
-    }
-  });
-}
+// No cross-tab localStorage sync; state is kept in-memory per tab.
 
 export function useSimStore(selector = (s) => s) {
   const [snapshot, setSnapshot] = useState(() => selector(state));

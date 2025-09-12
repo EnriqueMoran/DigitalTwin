@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-const API_BASE = (import.meta && import.meta.env && import.meta.env.VITE_BACKEND_HTTP) || 'http://localhost:8001';
+// Derive backend base URL from current host if not provided via env
+const deriveApiBase = () => {
+  try {
+    const proto = window?.location?.protocol || 'http:';
+    const host = window?.location?.hostname || 'localhost';
+    const port = '8001';
+    return `${proto}//${host}:${port}`;
+  } catch (_) {
+    return 'http://localhost:8001';
+  }
+};
+const API_BASE = (import.meta && import.meta.env && import.meta.env.VITE_BACKEND_HTTP) || deriveApiBase();
 
 function sanitizeName(name) {
   const base = (name || '').trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '_') || 'recording';

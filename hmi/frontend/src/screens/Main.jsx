@@ -37,72 +37,106 @@ export default function MainScreen({ sensors }) {
   const [bottomLeftPanel, setBottomLeftPanel] = useState('systemStatus');
   const [bottomCenterPanel, setBottomCenterPanel] = useState('sensorData');
   const [bottomRightPanel, setBottomRightPanel] = useState('widgets');
-  const [routesState, setRoutesState] = useState(() => {
+  const deriveApiBase = () => {
     try {
-      return JSON.parse(localStorage.getItem('routes') || '{}');
-    } catch (e) {
-      return {};
+      const proto = window?.location?.protocol || 'http:';
+      const host = window?.location?.hostname || 'localhost';
+      return `${proto}//${host}:8001`;
+    } catch (_) {
+      return 'http://localhost:8001';
     }
-  });
-  const [mode, setMode] = useState(() => localStorage.getItem('mode') || 'Manual');
-  const [currentRoute, setCurrentRoute] = useState(() => {
-    const m = localStorage.getItem('currentRoute');
-    return m === '' ? null : m;
-  });
-  const [currentWpIdx, setCurrentWpIdx] = useState(() => {
-    const idx = Number(localStorage.getItem('currentWpIdx'));
-    return Number.isFinite(idx) ? idx : 0;
-    
-  });
-  const [gpsTrail, setGpsTrail] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('gpsTrail') || '[]');
-    } catch {
-      return [];
-    }
-  });
+  };
+  const API_BASE = (import.meta && import.meta.env && import.meta.env.VITE_BACKEND_HTTP) || deriveApiBase();
+  const [routesState, setRoutesState] = useState({});
+  const [mode, setMode] = useState('Manual');
+  const [currentRoute, setCurrentRoute] = useState(null);
+  const [currentWpIdx, setCurrentWpIdx] = useState(0);
+  const [gpsTrail, setGpsTrail] = useState([]);
   const [selectedRoute, setSelectedRoute] = useState('');
   const prevGpsPos = useRef(gpsTrail[gpsTrail.length - 1] || null);
 
   const setRoutes = (m) => {
+    // Deprecated: routes are now server-side. No-op here.
     setRoutesState(m);
-    localStorage.setItem('routes', JSON.stringify(m));
   };
 
+  // Persist UI state server-side when changed
   useEffect(() => {
-    localStorage.setItem('mode', mode);
+    fetch(`${API_BASE}/ui_state`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) }).catch(() => {});
   }, [mode]);
-
   useEffect(() => {
-    localStorage.setItem('currentRoute', currentRoute ?? '');
+    fetch(`${API_BASE}/ui_state`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentRoute }) }).catch(() => {});
   }, [currentRoute]);
-
   useEffect(() => {
-    localStorage.setItem('currentWpIdx', String(currentWpIdx));
+    fetch(`${API_BASE}/ui_state`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentWpIdx }) }).catch(() => {});
   }, [currentWpIdx]);
 
-  useEffect(() => {
-    localStorage.setItem('gpsTrail', JSON.stringify(gpsTrail));
-  }, [gpsTrail]);
-
+  const prevUptime = useRef(null);
   useEffect(() => {
     const uptime = sensors.uptime;
     if (uptime == null) return;
-    const prev = Number(localStorage.getItem('serviceUptime') || '0');
-    if (uptime < prev) {
-      setMode('Manual');
-      setCurrentRoute(null);
-      setCurrentWpIdx(0);
-      setGpsTrail([]);
-      localStorage.removeItem('mode');
-      localStorage.removeItem('currentRoute');
-      localStorage.removeItem('currentWpIdx');
-      localStorage.removeItem('gpsTrail');
-      // Also reset simulation forms/store on service restart
+    const prev = prevUptime.current;
+    if (prev != null && uptime < prev) {
       resetSimState();
     }
-    localStorage.setItem('serviceUptime', String(uptime));
+    prevUptime.current = uptime;
   }, [sensors.uptime]);
+
+  // Poll routes from backend so they are shared and coherent across sessions
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      fetch(`${API_BASE}/routes`).then(r => r.json()).then(d => {
+        if (!cancelled && d && d.routes && typeof d.routes === 'object') {
+          setRoutesState(d.routes);
+        }
+      }).catch(() => {});
+    };
+    load();
+    const id = setInterval(load, 1000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+
+  // One-time migration: if server has no routes, push any local routes to server
+  useEffect(() => {
+    try {
+      const local = JSON.parse(localStorage.getItem('routes') || '{}');
+      const names = Object.keys(local || {});
+      if (!names.length) return;
+      // If current server state is non-empty, skip migration
+      if (routesState && Object.keys(routesState).length > 0) return;
+      names.forEach((name) => {
+        const pts = Array.isArray(local[name]) ? local[name] : [];
+        fetch(`${API_BASE}/routes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, points: pts }),
+        }).catch(() => {});
+      });
+    } catch (_) {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Poll UI state and trail from backend so all sessions stay consistent
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      fetch(`${API_BASE}/ui_state`).then(r => r.json()).then(s => {
+        if (cancelled) return;
+        if (typeof s.mode === 'string') setMode(s.mode);
+        setCurrentRoute(s.currentRoute ?? null);
+        setCurrentWpIdx(Number.isFinite(Number(s.currentWpIdx)) ? Number(s.currentWpIdx) : 0);
+      }).catch(() => {});
+      fetch(`${API_BASE}/trail`).then(r => r.json()).then(d => {
+        if (cancelled) return;
+        const pts = Array.isArray(d.points) ? d.points : [];
+        setGpsTrail(pts);
+      }).catch(() => {});
+    };
+    load();
+    const id = setInterval(load, 1000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
 
   useEffect(() => {
     if (!String(mode).startsWith('Route') || !currentRoute) return;
@@ -161,7 +195,7 @@ export default function MainScreen({ sensors }) {
     const pos = [lat, lon];
     const prev = prevGpsPos.current;
     if (!prev || prev[0] !== pos[0] || prev[1] !== pos[1]) {
-      setGpsTrail((t) => [...t, pos]);
+      fetch(`${API_BASE}/trail/append`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat, lon }) }).catch(() => {});
       prevGpsPos.current = pos;
     }
   }, [sensors]);
@@ -198,7 +232,7 @@ export default function MainScreen({ sensors }) {
         trail={gpsTrail}
         selectedRoute={selectedRoute}
         setSelectedRoute={setSelectedRoute}
-        clearTrail={() => setGpsTrail([])}
+        clearTrail={() => { fetch(`${API_BASE}/trail/clear`, { method: 'POST' }).catch(() => {}); setGpsTrail([]); }}
       />
     );
   };

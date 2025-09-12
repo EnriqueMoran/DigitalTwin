@@ -27,7 +27,17 @@ function App() {
   }, [imuActive, gpsActive]);
 
   useEffect(() => {
-    const wsUrl = import.meta.env.VITE_BACKEND_WS || 'ws://localhost:8001/ws';
+    const deriveWs = () => {
+      try {
+        const isHttps = (window?.location?.protocol || 'http:') === 'https:';
+        const host = window?.location?.hostname || 'localhost';
+        const scheme = isHttps ? 'wss' : 'ws';
+        return `${scheme}://${host}:8001/ws`;
+      } catch (_) {
+        return 'ws://localhost:8001/ws';
+      }
+    };
+    const wsUrl = import.meta.env.VITE_BACKEND_WS || deriveWs();
     const ws = new WebSocket(wsUrl);
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data);

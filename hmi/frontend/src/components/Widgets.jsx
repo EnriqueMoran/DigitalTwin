@@ -1,20 +1,20 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
-function Compass({ heading = 0, cog = null }) {
+function Compass({ heading = 0, cog = null, size = 150 }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const size = canvas.width;
-    ctx.clearRect(0, 0, size, size);
+    const s = canvas.width;
+    ctx.clearRect(0, 0, s, s);
 
     // outer circle
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(size / 2, size / 2, size / 2 - 5, 0, 2 * Math.PI);
+    ctx.arc(s / 2, s / 2, s / 2 - 5, 0, 2 * Math.PI);
     ctx.stroke();
 
     // cardinal points
@@ -22,39 +22,39 @@ function Compass({ heading = 0, cog = null }) {
     ctx.font = '14px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('N', size / 2, 15);
-    ctx.fillText('S', size / 2, size - 15);
-    ctx.fillText('E', size - 15, size / 2);
-    ctx.fillText('W', 15, size / 2);
+    ctx.fillText('N', s / 2, 15);
+    ctx.fillText('S', s / 2, s - 15);
+    ctx.fillText('E', s - 15, s / 2);
+    ctx.fillText('W', 15, s / 2);
 
     // heading needle
     ctx.save();
-    ctx.translate(size / 2, size / 2);
+    ctx.translate(s / 2, s / 2);
     ctx.rotate(heading || 0);
     ctx.strokeStyle = 'red';
     ctx.beginPath();
     ctx.moveTo(0, 0);
-    ctx.lineTo(0, -size / 2 + 15);
+    ctx.lineTo(0, -s / 2 + 15);
     ctx.stroke();
     ctx.restore();
 
     if (cog !== null && cog !== undefined) {
       ctx.save();
-      ctx.translate(size / 2, size / 2);
+      ctx.translate(s / 2, s / 2);
       ctx.rotate(cog);
       ctx.strokeStyle = 'orange';
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.lineTo(0, -size / 2 + 15);
+      ctx.lineTo(0, -s / 2 + 15);
       ctx.stroke();
       ctx.restore();
     }
-  }, [heading, cog]);
+  }, [heading, cog, size]);
 
-  return <canvas ref={canvasRef} width={150} height={150} className="widget-canvas" />;
+  return <canvas ref={canvasRef} width={size} height={size} className="widget-canvas" />;
 }
 
-function AttitudeIndicator({ roll = 0, pitch = 0 }) {
+function AttitudeIndicator({ roll = 0, pitch = 0, size = 150 }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -97,12 +97,12 @@ function AttitudeIndicator({ roll = 0, pitch = 0 }) {
     ctx.moveTo(w / 2, h / 2);
     ctx.lineTo(w / 2, h / 2 + 30);
     ctx.stroke();
-  }, [roll, pitch]);
+  }, [roll, pitch, size]);
 
-  return <canvas ref={canvasRef} width={150} height={150} className="widget-canvas" />;
+  return <canvas ref={canvasRef} width={size} height={size} className="widget-canvas" />;
 }
 
-function Speedometer({ value = 0, max = 20 }) {
+function Speedometer({ value = 0, max = 20, size = 150 }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
@@ -146,12 +146,27 @@ function Speedometer({ value = 0, max = 20 }) {
     ctx.lineTo((radius - 15) * Math.cos(angle), (radius - 15) * Math.sin(angle));
     ctx.stroke();
     ctx.restore();
-  }, [value, max]);
+  }, [value, max, size]);
 
-  return <canvas ref={canvasRef} width={150} height={150} className="widget-canvas" />;
+  return <canvas ref={canvasRef} width={size} height={size} className="widget-canvas" />;
 }
 
 export default function Widgets({ sensors = {} }) {
+  const wrapRef = useRef(null);
+  const [size, setSize] = useState(150);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0].contentRect.width;
+      let newSize = 150;
+      if (w < 3 * 150 + 32) newSize = 130;
+      if (w < 3 * 130 + 32) newSize = 110;
+      setSize(newSize);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const toDeg = (r) => (r * 180) / Math.PI;
   const fmt3 = (rad) => {
     let d = ((toDeg(rad ?? 0) % 360) + 360) % 360;
@@ -159,12 +174,12 @@ export default function Widgets({ sensors = {} }) {
     return String(d).padStart(3, '0');
   };
   return (
-    <div>
+    <div ref={wrapRef}>
       <h3>Widgets</h3>
       <div className="widgets">
         <div className="widget">
           <h4>Heading</h4>
-          <Compass heading={sensors.heading} cog={sensors.cog} />
+          <Compass heading={sensors.heading} cog={sensors.cog} size={size} />
           <div className="value value-kv">
             <span className="kv-key"><span className="legend-color heading"></span>HDG:</span>
             <span className="kv-value">{((toDeg(sensors.heading ?? 0) + 360) % 360).toFixed(0)}°</span>
@@ -174,7 +189,7 @@ export default function Widgets({ sensors = {} }) {
         </div>
         <div className="widget">
           <h4>Attitude</h4>
-          <AttitudeIndicator roll={sensors.roll} pitch={sensors.pitch} />
+          <AttitudeIndicator roll={sensors.roll} pitch={sensors.pitch} size={size} />
           <div className="value value-kv">
             <span className="kv-key">Roll:</span>
             <span className="kv-value">{toDeg(sensors.roll ?? 0).toFixed(2)}°</span>
@@ -184,7 +199,7 @@ export default function Widgets({ sensors = {} }) {
         </div>
         <div className="widget">
           <h4>Speed</h4>
-          <Speedometer value={sensors.true_speed} />
+          <Speedometer value={sensors.true_speed} size={size} />
           <div className="value">{(sensors.true_speed ?? 0).toFixed(2)} m/s</div>
         </div>
       </div>
