@@ -218,12 +218,30 @@ export default function MapPanel({
     handleCenter();
   };
 
-  const handleCopyCoords = () => {
+  const handleCopyCoords = async () => {
     if (!contextMenu) return;
     // Ensure what we copy is wrapped to valid ranges
     const [latN, lonN] = normalizeLatLng(contextMenu.lat, contextMenu.lon);
     const text = `${latN.toFixed(15)}, ${lonN.toFixed(15)}`;
-    navigator.clipboard?.writeText(text);
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Fallback for non-secure contexts or unsupported Clipboard API
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'absolute';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+    } catch (err) {
+      // As last-resort, show a prompt so user can copy manually
+      try { window.prompt('Copy coordinates:', text); } catch (_) {}
+    }
     setContextMenu(null);
   };
 

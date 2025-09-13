@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const MAX_WAYPOINTS = 10;
 const DECIMALS = 15;
@@ -36,39 +36,71 @@ export default function RoutesManagerViewer({ routes = {}, setRoutes = () => {} 
   const [waypoints, setWaypoints] = useState(
     Array.from({ length: MAX_WAYPOINTS }, emptyWaypoint)
   );
+  const [dirty, setDirty] = useState(false);
+  const prevSelectedRef = useRef('');
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [newName, setNewName] = useState('');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const routeNames = Object.keys(routes);
 
+  // Sync from server when selected changes, or when server data updates and we are not editing
   useEffect(() => {
-    if (selected && routes[selected]) {
-      const wps = Array.from({ length: MAX_WAYPOINTS }, emptyWaypoint);
-      routes[selected].forEach((wp, i) => {
-        if (i < MAX_WAYPOINTS) {
-          wps[i] = {
-            lat: normalizeLat(Number(wp.lat)).toFixed(DECIMALS),
-            lon: normalizeLng(Number(wp.lon)).toFixed(DECIMALS),
-          };
-        }
-      });
-      setWaypoints(wps);
-    } else {
-      setWaypoints(Array.from({ length: MAX_WAYPOINTS }, emptyWaypoint));
+    const prevSelected = prevSelectedRef.current;
+    const selectedChanged = prevSelected !== selected;
+    prevSelectedRef.current = selected;
+
+    // If selection changed, always refresh from server and clear dirty
+    if (selectedChanged) {
+      if (selected && routes[selected]) {
+        const wps = Array.from({ length: MAX_WAYPOINTS }, emptyWaypoint);
+        routes[selected].forEach((wp, i) => {
+          if (i < MAX_WAYPOINTS) {
+            wps[i] = {
+              lat: normalizeLat(Number(wp.lat)).toFixed(DECIMALS),
+              lon: normalizeLng(Number(wp.lon)).toFixed(DECIMALS),
+            };
+          }
+        });
+        setWaypoints(wps);
+      } else {
+        setWaypoints(Array.from({ length: MAX_WAYPOINTS }, emptyWaypoint));
+      }
+      setDirty(false);
+      return;
     }
-  }, [selected, routes]);
+
+    // If server pushed an update and we are not editing locally, refresh
+    if (!dirty) {
+      if (selected && routes[selected]) {
+        const wps = Array.from({ length: MAX_WAYPOINTS }, emptyWaypoint);
+        routes[selected].forEach((wp, i) => {
+          if (i < MAX_WAYPOINTS) {
+            wps[i] = {
+              lat: normalizeLat(Number(wp.lat)).toFixed(DECIMALS),
+              lon: normalizeLng(Number(wp.lon)).toFixed(DECIMALS),
+            };
+          }
+        });
+        setWaypoints(wps);
+      } else {
+        setWaypoints(Array.from({ length: MAX_WAYPOINTS }, emptyWaypoint));
+      }
+    }
+  }, [selected, routes, dirty]);
 
   const updateWaypoint = (idx, field, value) => {
     const updated = [...waypoints];
     updated[idx] = { ...updated[idx], [field]: value };
     setWaypoints(updated);
+    setDirty(true);
   };
 
   const clearWaypoint = (idx) => {
     const updated = [...waypoints];
     updated[idx] = emptyWaypoint();
     setWaypoints(updated);
+    setDirty(true);
   };
 
   const saveRoute = async () => {
@@ -90,6 +122,7 @@ export default function RoutesManagerViewer({ routes = {}, setRoutes = () => {} 
         body: JSON.stringify({ name: selected, points: converted }),
       });
     } catch (_) {}
+    setDirty(false);
   };
 
   const confirmNewRoute = async () => {
@@ -109,6 +142,7 @@ export default function RoutesManagerViewer({ routes = {}, setRoutes = () => {} 
     } catch (_) {}
     setSelected(newName);
     setShowNameDialog(false);
+    setDirty(false);
   };
 
   const deleteRoute = () => {
@@ -121,6 +155,7 @@ export default function RoutesManagerViewer({ routes = {}, setRoutes = () => {} 
     setSelected('');
     setWaypoints([]);
     setShowDeleteDialog(false);
+    setDirty(false);
   };
 
   return (
