@@ -282,14 +282,35 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
             STATE["latency"] = max(0.0, float(LAST_MESSAGE_TIME - ts))
         except Exception:
             pass
+        # Convert optional heading/COG from GPS into radians
+        heading_rad: float | None = None
         if heading_deg is not None:
             try:
-                STATE["heading"] = radians(float(heading_deg))
+                heading_rad = radians(float(heading_deg))
+                STATE["heading"] = heading_rad
             except Exception:
-                pass
+                heading_rad = None
         if cog_deg is not None:
             try:
                 STATE["cog"] = radians(float(cog_deg))
+            except Exception:
+                pass
+
+        # When IMU is simulated, prefer real IMU heading if we have recent sensor/* IMU data.
+        # Only fall back to GPS heading/COG if no recent real IMU.
+        if SIM_IMU_ACTIVE:
+            try:
+                now_sec = time.time()
+                have_recent_imu = (
+                    SENSOR_IMU_LAST_TIME is not None and (now_sec - SENSOR_IMU_LAST_TIME) <= 2.0
+                )
+                if not have_recent_imu:
+                    if heading_rad is not None:
+                        STATE["heading"] = heading_rad
+                    else:
+                        c = STATE.get("cog")
+                        if isinstance(c, (int, float)) and isfinite(float(c)):
+                            STATE["heading"] = float(c)
             except Exception:
                 pass
 
@@ -322,8 +343,11 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
             SENSOR_STATES["gps"] = "Running" if valid else "Degraded"
 
     elif topic in (TOPIC_SENSOR_IMU, TOPIC_SIM_IMU):
-        # Gate IMU source similarly
-        if (topic == TOPIC_SENSOR_IMU and SIM_IMU_ACTIVE) or (topic == TOPIC_SIM_IMU and not SIM_IMU_ACTIVE):
+        # When simulation is active, allow both sources:
+        # - real sensor IMU provides heading only
+        # - simulated IMU provides pitch/roll (and optionally others)
+        # When simulation is not active, ignore simulated messages.
+        if topic == TOPIC_SIM_IMU and not SIM_IMU_ACTIVE:
             return
         # If this is a sensor/* IMU message, mark ESP32 last seen
         if topic == TOPIC_SENSOR_IMU:
@@ -347,8 +371,15 @@ def _on_message(client: mqtt.Client, userdata, msg: mqtt.MQTTMessage):
         ts = _parse_ts(payload.get("ts"))
 
         if ax is not None and ay is not None and az is not None:
-            STATE["roll"] = -atan2(ay, az)
-            STATE["pitch"] = -atan2(-ax, sqrt(ay * ay + az * az))
+            # During simulation, only the simulated IMU is allowed to override pitch/roll.
+            # Otherwise, real sensor IMU updates pitch/roll as usual.
+            if SIM_IMU_ACTIVE:
+                if topic == TOPIC_SIM_IMU:
+                    STATE["roll"] = -atan2(ay, az)
+                    STATE["pitch"] = -atan2(-ax, sqrt(ay * ay + az * az))
+            else:
+                STATE["roll"] = -atan2(ay, az)
+                STATE["pitch"] = -atan2(-ax, sqrt(ay * ay + az * az))
         STATE["rate_of_turn"] = gz
         if _prev_imu_ts is not None:
             dt = ts - _prev_imu_ts

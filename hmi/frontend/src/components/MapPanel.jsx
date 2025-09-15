@@ -82,13 +82,13 @@ export default function MapPanel({
   const PAN_MIN_MS = 125;
 
   const headingDeg = useMemo(() => {
-    const heading = sensors?.heading;
-    if (heading == null) return null;
-    const h = Number(heading);
+    const hSrc = sensors?.heading ?? sensors?.cog;
+    if (hSrc == null) return null;
+    const h = Number(hSrc);
     if (!Number.isFinite(h)) return null;
     const deg = Math.abs(h) > 2 * Math.PI ? h : (h * 180) / Math.PI;
     return ((deg % 360) + 360) % 360; // normalize to [0,360)
-  }, [sensors?.heading]);
+  }, [sensors?.heading, sensors?.cog]);
 
   const memoIcon = useMemo(() => createBoatIcon(headingDeg ?? 0), [headingDeg]);
 

@@ -8,6 +8,8 @@ The physical replica measures 60.5 × 9.5 × 17 cm and is equipped with an ESP32
 
 The Digital Twin includes simulators for each component (MPU9250 and NEO‑M8N‑0‑10) that can replicate their behavior and be combined with real sensor data.
 
+![](shared/docs/demo_video.mp4)
+
 ## Features
 - Web interface composed of configurable panels:
     - 3D Model

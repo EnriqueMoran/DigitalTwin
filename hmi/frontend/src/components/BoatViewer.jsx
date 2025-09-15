@@ -102,7 +102,9 @@ export default function BoatViewer({ sensors }) {
     function animate() {
       requestAnimationFrame(animate);
       if (liveRef.current && sensorsRef.current && modelRef.current) {
-        const { roll = 0, pitch = 0, heading = 0 } = sensorsRef.current;
+        const { roll = 0, pitch = 0 } = sensorsRef.current;
+        const hRaw = sensorsRef.current.heading ?? sensorsRef.current.cog ?? 0;
+        const heading = Number.isFinite(Number(hRaw)) ? Number(hRaw) : 0;
         let rx = pitch || 0;
         // Align yaw with compass (0=N, CW positive) and model forward axis
         let ry = -(heading || 0) + HEADING_OFFSET;
